@@ -1,5 +1,5 @@
 %% fmi.erl
-%% Fetch FMI observations and forecasts into the same day directories as entso.xml.
+%% Fetch FMI observations, forecasts, and temps.txt into the same day directories as entso.xml.
 -module(fmi).
 
 -include_lib("kernel/include/file.hrl").
@@ -52,10 +52,11 @@ fetch_day(Day, StartUtc, EndUtc, Place) ->
     DayDir = day_dir(Day),
     ObsOut = filename:join(DayDir, "fmi_obs.xml"),
     FcOut = filename:join(DayDir, "fmi_fc.xml"),
-    RawOut = filename:join(DayDir, "fmi_raw.tsv"),
+    TempsOut = filename:join(DayDir, "temps.txt"),
+    OldRawOut = filename:join(DayDir, "fmi_raw.tsv"),
     TmpObs = filename:join(?VOL, ".fmi_obs_" ++ Day ++ ".xml.tmp"),
     TmpFc = filename:join(?VOL, ".fmi_fc_" ++ Day ++ ".xml.tmp"),
-    TmpRaw = filename:join(?VOL, ".fmi_raw_" ++ Day ++ ".tsv.tmp"),
+    TmpTemps = filename:join(?VOL, ".temps_" ++ Day ++ ".txt.tmp"),
     ok = filelib:ensure_dir(filename:join(DayDir, "dummy")),
     ok = filelib:ensure_dir(filename:join(?VOL, "dummy")),
     ObsUrl = fmi_url("fmi::observations::weather::timevaluepair", Place, "t2m", StartUtc, EndUtc),
@@ -63,20 +64,21 @@ fetch_day(Day, StartUtc, EndUtc, Place) ->
     try
         ok = require_ok(fetch(ObsUrl, TmpObs), {fetch_obs, Day}),
         ok = require_ok(fetch(FcUrl, TmpFc), {fetch_forecast, Day}),
-        Raw = raw_tsv(TmpObs, TmpFc),
-        ok = file:write_file(TmpRaw, Raw),
+        Measurements = measurements(TmpObs, TmpFc),
+        ok = file:write_file(TmpTemps, temps_txt(Measurements)),
         ok = file:rename(TmpObs, ObsOut),
         ok = file:rename(TmpFc, FcOut),
-        ok = file:rename(TmpRaw, RawOut),
+        ok = file:rename(TmpTemps, TempsOut),
+        _ = file:delete(OldRawOut),
         Metadata = #{day => Day, place => Place, start => StartUtc, 'end' => EndUtc,
-            obs_xml => ObsOut, fc_xml => FcOut, raw_tsv => RawOut},
-        log("fmi: päivitetty päivä=~s paikka=~s väli=~s...~s tiedosto=~s", [Day, Place, StartUtc, EndUtc, RawOut]),
+            obs_xml => ObsOut, fc_xml => FcOut, temps => TempsOut, measurements => Measurements},
+        log("fmi: päivitetty päivä=~s paikka=~s väli=~s...~s tiedosto=~s", [Day, Place, StartUtc, EndUtc, TempsOut]),
         {ok, Metadata}
     catch
         Class:Reason:Stacktrace ->
             _ = file:delete(TmpObs),
             _ = file:delete(TmpFc),
-            _ = file:delete(TmpRaw),
+            _ = file:delete(TmpTemps),
             log("fmi: ERROR päivä=~s paikka=~s väli=~s...~s ~p:~p", [Day, Place, StartUtc, EndUtc, Class, Reason]),
             logger:debug("fmi stacktrace: ~p", [Stacktrace]),
             {error, {Class, Reason}}
@@ -144,26 +146,28 @@ require_ok(ok, _Context) ->
 require_ok({error, Reason}, Context) ->
     error({Context, Reason}).
 
-raw_tsv(ObsXml, FcXml) ->
-    Obs = parse_timevaluepair("havainto", ObsXml),
-    Fc = parse_timevaluepair("ennuste", FcXml),
-    Lines = ["# tyyppi|UTC-aika|lämpötila_C" | Obs ++ Fc],
-    unicode:characters_to_binary([Line ++ "\n" || Line <- Lines]).
+measurements(ObsXml, FcXml) ->
+    Obs = parse_timevaluepair(havainto, ObsXml),
+    Fc = parse_timevaluepair(ennuste, FcXml),
+    Obs ++ Fc.
+
+temps_txt(Measurements) ->
+    unicode:characters_to_binary([Value ++ "\n" || #{value := Value} <- Measurements]).
 
 parse_timevaluepair(Label, File) ->
     case file:read_file_info(File) of
         {ok, #file_info{size = Size}} when Size > 0 ->
             {Doc, _} = xmerl_scan:file(File),
             Nodes = xmerl_xpath:string("//*[local-name()='MeasurementTVP']", Doc),
-            [measurement_line(Label, Node) || Node <- Nodes];
+            [measurement(Label, Node) || Node <- Nodes];
         _ ->
             error({missing_or_empty_xml, File})
     end.
 
-measurement_line(Label, Node) ->
-    Time = xpath_string("*[local-name()='time']", Node),
-    Value = xpath_string("*[local-name()='value']", Node),
-    Label ++ "|" ++ Time ++ "|" ++ Value.
+measurement(Label, Node) ->
+    #{type => Label,
+        time => xpath_string("*[local-name()='time']", Node),
+        value => xpath_string("*[local-name()='value']", Node)}.
 
 xpath_string(Path, Node) ->
     {_, _, Value} = xmerl_xpath:string("string(" ++ Path ++ ")", Node),
