@@ -65,7 +65,7 @@ fetch_day(Day, StartUtc, EndUtc, Place) ->
         ok = require_ok(fetch(ObsUrl, TmpObs), {fetch_obs, Day}),
         ok = require_ok(fetch(FcUrl, TmpFc), {fetch_forecast, Day}),
         Measurements = measurements(TmpObs, TmpFc),
-        ok = file:write_file(TmpTemps, temps_txt(Measurements)),
+        ok = file:write_file(TmpTemps, temps_txt(Measurements, StartUtc, EndUtc)),
         ok = file:rename(TmpObs, ObsOut),
         ok = file:rename(TmpFc, FcOut),
         ok = file:rename(TmpTemps, TempsOut),
@@ -151,8 +151,101 @@ measurements(ObsXml, FcXml) ->
     Fc = parse_timevaluepair(ennuste, FcXml),
     Obs ++ Fc.
 
-temps_txt(Measurements) ->
-    unicode:characters_to_binary([Value ++ "\n" || #{value := Value} <- Measurements]).
+temps_txt(Measurements, StartUtc0, EndUtc0) ->
+    StartUtc = normalize_utc(StartUtc0),
+    EndUtc = normalize_utc(EndUtc0),
+    StartEpoch = utc_to_epoch(StartUtc),
+    EndEpoch = utc_to_epoch(EndUtc),
+    case EndEpoch > StartEpoch of
+        true -> ok;
+        false -> error({invalid_time_interval, StartUtc, EndUtc})
+    end,
+    Obs = series(havainto, Measurements),
+    Fc = series(ennuste, Measurements),
+    Lines = [temperature_line(Epoch, Obs, Fc) || Epoch <- lists:seq(StartEpoch, EndEpoch - 900, 900)],
+    unicode:characters_to_binary(Lines).
+
+series(Type, Measurements) ->
+    Points = [
+        {Epoch, Temp}
+        || #{type := MType, time := Time, value := Value} <- Measurements,
+            MType =:= Type,
+            {ok, Epoch} <- [utc_to_epoch_safe(Time)],
+            {ok, Temp} <- [temperature_to_float(Value)]
+    ],
+    lists:sort(maps:to_list(maps:from_list(Points))).
+
+temperature_line(Epoch, Obs, Fc) ->
+    Temp = case value_at(Obs, Epoch, no_extrapolate) of
+        {ok, ObsTemp} -> ObsTemp;
+        unavailable ->
+            case value_at(Fc, Epoch, extrapolate) of
+                {ok, FcTemp} -> FcTemp;
+                unavailable -> error({missing_temperature, epoch_to_utc(Epoch)})
+            end
+    end,
+    lists:flatten(io_lib:format("~s ~B~n", [epoch_to_utc(Epoch), round(Temp)])).
+
+value_at([], _Epoch, _Mode) ->
+    unavailable;
+value_at([{Epoch, Temp} | _], Epoch, _Mode) ->
+    {ok, Temp};
+value_at([{FirstEpoch, FirstTemp} | _], Epoch, extrapolate) when Epoch < FirstEpoch ->
+    {ok, FirstTemp};
+value_at(Series, Epoch, Mode) ->
+    value_at(Series, Epoch, Mode, unavailable).
+
+value_at([{Epoch, Temp} | _], Epoch, _Mode, _Prev) ->
+    {ok, Temp};
+value_at([{NextEpoch, NextTemp} | _], Epoch, _Mode, {PrevEpoch, PrevTemp}) when PrevEpoch < Epoch, Epoch < NextEpoch ->
+    Fraction = (Epoch - PrevEpoch) / (NextEpoch - PrevEpoch),
+    {ok, PrevTemp + Fraction * (NextTemp - PrevTemp)};
+value_at([{PointEpoch, PointTemp}], Epoch, extrapolate, _Prev) when Epoch > PointEpoch ->
+    {ok, PointTemp};
+value_at([{PointEpoch, PointTemp} | Rest], Epoch, Mode, _Prev) when PointEpoch < Epoch ->
+    value_at(Rest, Epoch, Mode, {PointEpoch, PointTemp});
+value_at(_Series, _Epoch, _Mode, _Prev) ->
+    unavailable.
+
+temperature_to_float(Value0) ->
+    Value = string:trim(Value0),
+    case string:lowercase(Value) of
+        "nan" -> error;
+        "" -> error;
+        _ ->
+            case string:to_float(Value) of
+                {Float, []} -> {ok, Float};
+                {error, no_float} ->
+                    case string:to_integer(Value) of
+                        {Int, []} -> {ok, Int * 1.0};
+                        _ -> error
+                    end;
+                _ -> error
+            end
+    end.
+
+utc_to_epoch_safe(Time) ->
+    try {ok, utc_to_epoch(normalize_utc(Time))}
+    catch _:_ -> error
+    end.
+
+utc_to_epoch(Utc) ->
+    [Date, TimeZ] = string:split(Utc, "T"),
+    Time = string:trim(TimeZ, trailing, "Z"),
+    [YS, MS, DS] = string:split(Date, "-", all),
+    [HS, MinS, SS] = string:split(Time, ":", all),
+    DateTime = {
+        {list_to_integer(YS), list_to_integer(MS), list_to_integer(DS)},
+        {list_to_integer(HS), list_to_integer(MinS), list_to_integer(SS)}
+    },
+    calendar:datetime_to_gregorian_seconds(DateTime) - unix_epoch_gregorian_seconds().
+
+epoch_to_utc(Epoch) ->
+    {{Y, M, D}, {H, Min, S}} = calendar:gregorian_seconds_to_datetime(Epoch + unix_epoch_gregorian_seconds()),
+    lists:flatten(io_lib:format("~4..0B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ", [Y, M, D, H, Min, S])).
+
+unix_epoch_gregorian_seconds() ->
+    calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}).
 
 parse_timevaluepair(Label, File) ->
     case file:read_file_info(File) of
