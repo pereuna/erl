@@ -1,0 +1,14 @@
+{application, quarter,
+ [
+  {description, "Quarter scheduler for ENTSO-E and FMI data fetching"},
+  {vsn, "0.1.0"},
+  {registered, [quarter_sup, quarter_worker, quarter_scheduler, worker]},
+  {mod, {quarter_app, []}},
+  {applications, [
+    kernel,
+    stdlib,
+    inets,
+    ssl,
+    xmerl
+  ]}
+ ]}.
