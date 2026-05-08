@@ -1,0 +1,9 @@
+## Erlang VM options for the quarter release.
+## Keep the node local by default; change to -name if distributed Erlang is needed.
+-sname quarter
+
+## Keep cookie out of git in production if distributed Erlang is enabled across hosts.
+-setcookie quarter_dev_cookie_change_me
+
+## Start without an interactive shell when the release script runs in foreground/start mode.
+-noshell
