@@ -1,7 +1,7 @@
 %% quarter_worker.erl
 -module(quarter_worker).
 -behaviour(gen_server).
--export([start_link/0, do_work/0, do_run_plan/0]).
+-export([start_link/0, do_work/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(entso_xml, {day, file, start = [], 'end' = []}).
@@ -9,17 +9,22 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% API: kutsutaan schedulerista
+%% API: voidaan kutsua myös käsin tarvittaessa.
 do_work() ->
     gen_server:cast(?MODULE, do_work).
 
-%% Päivittäinen run.txt-suunnittelu seuraavaa päivää varten.
-do_run_plan() ->
-    gen_server:cast(?MODULE, do_run_plan).
-
 %% gen_server callbacks
 init([]) ->
-    {ok, #{entso_xml => #{}}}.
+    Ref = schedule_quarter_work(),
+    {ok, #{entso_xml => #{}, timer_ref => Ref}}.
+
+handle_info(fire_quarter_work, State) ->
+    do_work(),
+    Ref = schedule_quarter_work(),
+    {noreply, State#{timer_ref => Ref}};
+
+handle_info(_Info, State) ->
+    {noreply, State}.
 
 handle_cast(do_work, State) ->
     TodayUtc = eutils:today_utc_string(),
@@ -28,22 +33,14 @@ handle_cast(do_work, State) ->
     NewState = lists:foldl(fun fetch_and_store/2, State, FetchDays),
     {noreply, NewState};
 
-handle_cast(do_run_plan, State) ->
-    Day = eutils:tomorrow_utc_string(),
-    Result = update_run_plan(Day),
-    logger:info("daily run plan result: ~p", [Result]),
-    {noreply, State#{last_run_plan_day => Day, run_results => [Result]}};
-
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_call(_Req, _From, State) ->
     {reply, ok, State}.
 
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-terminate(_Reason, _State) ->
+terminate(_Reason, State) ->
+    cancel_timer(maps:get(timer_ref, State, undefined)),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -71,13 +68,11 @@ fetch_and_store(Day, State) ->
     end.
 
 
-update_run_plan(Day) ->
-    try entso_run:plan_day(Day) of
-        Result ->
-            {Day, Result}
-    catch
-        Class:Reason:Stacktrace ->
-            logger:error("run plan failed: day=~s ~p:~p", [Day, Class, Reason]),
-            logger:debug("run plan stacktrace: ~p", [Stacktrace]),
-            {Day, {error, {Class, Reason}}}
-    end.
+schedule_quarter_work() ->
+    erlang:send_after(eutils:compute_delay_to_next_quarter_ms(), self(), fire_quarter_work).
+
+cancel_timer(undefined) ->
+    ok;
+cancel_timer(Ref) ->
+    erlang:cancel_timer(Ref),
+    ok.

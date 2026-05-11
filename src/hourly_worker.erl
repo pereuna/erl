@@ -3,7 +3,7 @@
 -module(hourly_worker).
 -behaviour(gen_server).
 
--export([start_link/0, do_work/0, compute_delay_to_next_hour_ms/0]).
+-export([start_link/0, do_work/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(entso_xml, {day, file, start = [], 'end' = []}).
@@ -90,12 +90,4 @@ fetch_fmi(Specs) ->
     fmi:fetch_days(Specs).
 
 schedule_hourly_work() ->
-    erlang:send_after(compute_delay_to_next_hour_ms(), self(), fire_hourly_work).
-
-compute_delay_to_next_hour_ms() ->
-    HourMs = 60 * 60 * 1000,
-    Rem = erlang:system_time(millisecond) rem HourMs,
-    case Rem of
-        0 -> 0;
-        X -> HourMs - X
-    end.
+    erlang:send_after(eutils:compute_delay_to_next_hour_ms(), self(), fire_hourly_work).

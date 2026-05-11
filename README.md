@@ -63,14 +63,17 @@ Erlangia käytetään tai node on muuten saavutettavissa.
 
 ### Ajastus
 
+* Erillistä `scheduler`-prosessia ei ole: `quarter_worker`, `hourly_worker` ja
+  `daily_run_worker` ovat itsenäisiä gen_servereitä, jotka ajastavat omat työnsä
+  yhteisillä `eutils`-viivelaskureilla.
 * `quarter_worker` tarkistaa ENTSO-E:n vartin välein: jos päivän `entso.xml` on
   jo haettu ja kelvollinen, sitä käytetään; muuten se haetaan. Klo 15:00 jälkeen
   sama tarkistus tehdään myös seuraavalle päivälle.
 * `hourly_worker` hakee FMI:n uusimmat havainnot ja ennusteen kerran tunnissa
   ilman erillistä cache/due-tarkistusta. Ennen FMI-hakua se varmistaa ENTSO-E:n
   päivän aikavälin samalla `kurl:fetch_day/1`-tarkistuksella.
-* `scheduler` ajaa edelleen illan `run.txt`-suunnittelun klo 21:41
-  paikallista aikaa seuraavaa päivää varten.
+* `daily_run_worker` ajaa illan `run.txt`-suunnittelun klo 21:41 paikallista
+  aikaa seuraavaa päivää varten.
 
 ## ENTSO/FMI run.txt -suunnittelu
 
