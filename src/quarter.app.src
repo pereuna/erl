@@ -1,12 +1,12 @@
 {application, quarter,
  [
-  {description, "Quarter scheduler for ENTSO-E fetching, hourly FMI updates and run planning"},
+  {description, "Workers for ENTSO-E fetching, hourly FMI updates and run planning"},
   {vsn, "0.1.0"},
   %% Rebar3 täyttää tämän listan automaattisesti src/*.erl-tiedostoista.
   %% Pidä avain mukana, jotta uudet moduulit päätyvät myös generoituun .app-tiedostoon
   %% ja releaseen ilman käsin ylläpidettävää moduulilistaa.
   {modules, []},
-  {registered, [quarter_supervisor, quarter_worker, hourly_worker, scheduler]},
+  {registered, [quarter_supervisor, quarter_worker, hourly_worker, daily_run_worker]},
   {mod, {quarter_app, []}},
   {applications, [
     kernel,

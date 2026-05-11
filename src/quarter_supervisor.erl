@@ -12,7 +12,7 @@ init([]) ->
          permanent, 5000, worker, [quarter_worker]},
         {hourly_worker, {hourly_worker, start_link, []},
          permanent, 5000, worker, [hourly_worker]},
-        {scheduler, {scheduler, start_link, []},
-         permanent, 5000, worker, [scheduler]}
+        {daily_run_worker, {daily_run_worker, start_link, []},
+         permanent, 5000, worker, [daily_run_worker]}
     ],
     {ok, {{one_for_one, 5, 10}, Children}}.
