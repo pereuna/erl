@@ -1,5 +1,5 @@
-%% quarter_sup.erl
--module(quarter_sup).
+%% quarter_supervisor.erl
+-module(quarter_supervisor).
 -behaviour(supervisor).
 -export([start_link/0, init/1]).
 
@@ -12,9 +12,7 @@ init([]) ->
          permanent, 5000, worker, [quarter_worker]},
         {hourly_worker, {hourly_worker, start_link, []},
          permanent, 5000, worker, [hourly_worker]},
-        {quarter_scheduler, {quarter_scheduler, start_link, []},
-         permanent, 5000, worker, [quarter_scheduler]},
-        {worker, {worker, start_link, []},
-         permanent, 5000, worker, [worker]}
+        {scheduler, {scheduler, start_link, []},
+         permanent, 5000, worker, [scheduler]}
     ],
     {ok, {{one_for_one, 5, 10}, Children}}.

@@ -6,7 +6,7 @@
   %% Pidä avain mukana, jotta uudet moduulit päätyvät myös generoituun .app-tiedostoon
   %% ja releaseen ilman käsin ylläpidettävää moduulilistaa.
   {modules, []},
-  {registered, [quarter_sup, quarter_worker, hourly_worker, quarter_scheduler, worker]},
+  {registered, [quarter_supervisor, quarter_worker, hourly_worker, scheduler]},
   {mod, {quarter_app, []}},
   {applications, [
     kernel,

@@ -1,5 +1,5 @@
-%% quarter_scheduler.erl
--module(quarter_scheduler).
+%% scheduler.erl
+-module(scheduler).
 -behaviour(gen_server).
 -export([start_link/0, compute_delay_to_next_quarter_ms/0, compute_delay_to_next_daily_run_ms/0]).
 -export([init/1, handle_info/2, handle_call/3, handle_cast/2, terminate/2, code_change/3]).
