@@ -1,44 +1,93 @@
 -module(xml_parse).
--export([parse/0]).
+-export([parse_file/1, write_prices/1, write_prices/2]).
+
+-include_lib("xmerl/include/xmerl.hrl").
 
 -define(QUARTSEC, 900).  %% 15 minutes in seconds
 
-%% parse/0 parses the XML file koe.xml and returns a list of tuples with position and price
-%% fill_gaps/1 fills missing positions in the list with previous price value
+%% Parse a day-directory ENTSO XML file, normally YYYY/MM/DD/entso.xml, into
+%% the same logical rows that the old do_entso step wrote to prices.txt: UTC
+%% timestamp and filled quarter-hour price.
+parse_file(File) ->
+    {Doc, _} = xmerl_scan:file(File),
+    Periods = xmerl_xpath:string("//*[local-name()='Period']", Doc),
+    lists:append([period_prices(Period) || Period <- Periods]).
 
-parse() ->
-    {E, _R} = xmerl_scan:file("koe.xml"),
-    PointsNodes = xmerl_xpath:string("//*[local-name()='Point']", E),
-    Pairs = [{pos_int(Node, "position"), price_float(Node, "price.amount")} || Node <- PointsNodes],
-    [Nod] = xmerl_xpath:string(
-        "/*[local-name()='Publication_MarketDocument']"
-        "//*[local-name()='period.timeInterval']/*[local-name()='start']", E),
-    {_, _, Str} = xmerl_xpath:string("string()", Nod),
-    Ep = calendar:rfc3339_to_system_time(lists:sublist(Str, length(Str) - 1) ++ ":00+00:00"),
-    Pairsf = fill_gaps(Pairs, 1, 0.0),
-    [{Ep + (Pos - 1) * ?QUARTSEC, Price} || {Pos, Price} <- Pairsf, Pos =< 96].
+%% Write prices.txt next to the given day-directory entso.xml.
+write_prices(EntsoXml) ->
+    write_prices(EntsoXml, filename:join(filename:dirname(EntsoXml), "prices.txt")).
 
-fill_gaps(Pairs, N, LastPrice) ->
-    case Pairs of
-        %% Exact match for this position: keep it
-        [{N, Price} | Rest] ->
-            [{N, Price} | fill_gaps(Rest, N + 1, Price)];
+write_prices(EntsoXml, PricesFile) ->
+    Rows = parse_file(EntsoXml),
+    ok = file:write_file(PricesFile, prices_txt(Rows)),
+    {ok, #{prices => PricesFile, rows => length(Rows)}}.
 
-        %% Missing position: use last known price
-        [{_Pos, _Price} | _] = All ->
-            [{N, LastPrice} | fill_gaps(All, N + 1, LastPrice)];
+period_prices(Period) ->
+    Start = xpath_string(".//*[local-name()='timeInterval']/*[local-name()='start']", Period),
+    End = xpath_string(".//*[local-name()='timeInterval']/*[local-name()='end']", Period),
+    StartEpoch = utc_to_epoch(normalize_utc(Start)),
+    EndEpoch = utc_to_epoch(normalize_utc(End)),
+    PointNodes = xmerl_xpath:string("*[local-name()='Point']", Period),
+    Points = lists:sort([{pos_int(Node), price_float(Node)} || Node <- PointNodes]),
+    Count = max(0, (EndEpoch - StartEpoch) div ?QUARTSEC),
+    Filled = fill_gaps(Points, 1, Count, 0.0),
+    [{epoch_to_utc(StartEpoch + (Pos - 1) * ?QUARTSEC), Price} || {Pos, Price} <- Filled].
 
-        %% End of list
-        [] ->
-            []
+fill_gaps(_Points, N, Count, _LastPrice) when N > Count ->
+    [];
+fill_gaps([{N, Price} | Rest], N, Count, _LastPrice) ->
+    [{N, Price} | fill_gaps(Rest, N + 1, Count, Price)];
+fill_gaps([{Pos, _Price} | _] = Points, N, Count, LastPrice) when Pos > N ->
+    [{N, LastPrice} | fill_gaps(Points, N + 1, Count, LastPrice)];
+fill_gaps([{_Pos, Price} | Rest], N, Count, _LastPrice) ->
+    fill_gaps(Rest, N, Count, Price);
+fill_gaps([], N, Count, LastPrice) ->
+    [{N, LastPrice} | fill_gaps([], N + 1, Count, LastPrice)].
+
+prices_txt(Rows) ->
+    unicode:characters_to_binary([io_lib:format("~s ~.2f~n", [Time, Price]) || {Time, Price} <- Rows]).
+
+pos_int(Node) ->
+    {Pos, []} = string:to_integer(xpath_string("*[local-name()='position']", Node)),
+    Pos.
+
+price_float(Node) ->
+    parse_float(xpath_string("*[local-name()='price.amount']", Node)).
+
+xpath_string(Path, Node) ->
+    {_, _, Value} = xmerl_xpath:string("string(" ++ Path ++ ")", Node),
+    string:trim(unicode:characters_to_list(Value)).
+
+parse_float(Value) ->
+    case string:to_float(Value) of
+        {Float, []} -> Float;
+        {error, no_float} ->
+            {Int, []} = string:to_integer(Value),
+            Int * 1.0
     end.
 
-pos_int(Node, Field) ->
-    Lf = lists:flatten(io_lib:format("string(*[local-name()='~s'])", [Field])),
-    {_, _, Val} = xmerl_xpath:string(Lf, Node),
-    element(1, string:to_integer(Val)).
+normalize_utc(Time) ->
+    S = string:trim(Time),
+    case {length(S), lists:suffix("Z", S)} of
+        {17, true} -> lists:sublist(S, 16) ++ ":00Z";
+        {20, true} -> S;
+        _ -> error({invalid_utc_time, Time})
+    end.
 
-price_float(Node, Field) ->
-    Lf = lists:flatten(io_lib:format("string(*[local-name()='~s'])", [Field])),
-    {_, _, Val} = xmerl_xpath:string(Lf, Node),
-    element(1, string:to_float(Val ++ ".0")).
+utc_to_epoch(Utc) ->
+    [Date, TimeZ] = string:split(Utc, "T"),
+    Time = string:trim(TimeZ, trailing, "Z"),
+    [YS, MS, DS] = string:split(Date, "-", all),
+    [HS, MinS, SS] = string:split(Time, ":", all),
+    DateTime = {
+        {list_to_integer(YS), list_to_integer(MS), list_to_integer(DS)},
+        {list_to_integer(HS), list_to_integer(MinS), list_to_integer(SS)}
+    },
+    calendar:datetime_to_gregorian_seconds(DateTime) - unix_epoch_gregorian_seconds().
+
+epoch_to_utc(Epoch) ->
+    {{Y, M, D}, {H, Min, S}} = calendar:gregorian_seconds_to_datetime(Epoch + unix_epoch_gregorian_seconds()),
+    lists:flatten(io_lib:format("~4..0B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ", [Y, M, D, H, Min, S])).
+
+unix_epoch_gregorian_seconds() ->
+    calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}).

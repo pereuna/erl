@@ -1,12 +1,10 @@
 %% quarter_worker.erl
 -module(quarter_worker).
 -behaviour(gen_server).
--export([start_link/0, do_work/0]).
+-export([start_link/0, do_work/0, do_run_plan/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(entso_xml, {day, file, start = [], 'end' = []}).
-
--define(FMI_INTERVAL_SECONDS, 60 * 60).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -15,17 +13,26 @@ start_link() ->
 do_work() ->
     gen_server:cast(?MODULE, do_work).
 
+%% Päivittäinen run.txt-suunnittelu seuraavaa päivää varten.
+do_run_plan() ->
+    gen_server:cast(?MODULE, do_run_plan).
+
 %% gen_server callbacks
 init([]) ->
-    {ok, #{entso_xml => #{}, last_fmi_update => undefined}}.
+    {ok, #{entso_xml => #{}}}.
 
 handle_cast(do_work, State) ->
     TodayUtc = eutils:today_utc_string(),
     FetchDays = fetch_days(TodayUtc, eutils:local_hour()),
     logger:info("qw ~p fetch_days:~p", [calendar:local_time(), FetchDays]),
-    State1 = lists:foldl(fun fetch_and_store/2, State, FetchDays),
-    NewState = update_fmi_if_due(State1, FetchDays),
+    NewState = lists:foldl(fun fetch_and_store/2, State, FetchDays),
     {noreply, NewState};
+
+handle_cast(do_run_plan, State) ->
+    Day = eutils:tomorrow_utc_string(),
+    Result = update_run_plan(Day),
+    logger:info("daily run plan result: ~p", [Result]),
+    {noreply, State#{last_run_plan_day => Day, run_results => [Result]}};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -63,41 +70,14 @@ fetch_and_store(Day, State) ->
             State
     end.
 
-update_fmi_if_due(State, FetchDays) ->
-    Now = erlang:system_time(second),
-    LastUpdate = maps:get(last_fmi_update, State, undefined),
-    case fmi_update_due(Now, LastUpdate) of
-        true ->
-            update_fmi(State, FetchDays, Now);
-        false ->
-            State
+
+update_run_plan(Day) ->
+    try entso_run:plan_day(Day) of
+        Result ->
+            {Day, Result}
+    catch
+        Class:Reason:Stacktrace ->
+            logger:error("run plan failed: day=~s ~p:~p", [Day, Class, Reason]),
+            logger:debug("run plan stacktrace: ~p", [Stacktrace]),
+            {Day, {error, {Class, Reason}}}
     end.
-
-update_fmi(State, FetchDays, Now) ->
-    Specs = fmi_day_specs(State, FetchDays),
-    case Specs of
-        [] ->
-            State;
-        _ ->
-            Results = fmi:fetch_days(Specs),
-            logger:info("fmi update results: ~p", [Results]),
-            State#{last_fmi_update => Now, fmi_results => Results}
-    end.
-
-fmi_day_specs(State, FetchDays) ->
-    EntsoByDay = maps:get(entso_xml, State, #{}),
-    lists:filtermap(
-        fun(Day) ->
-            case maps:get(Day, EntsoByDay, undefined) of
-                #entso_xml{start = [Start | _], 'end' = [End | _]} ->
-                    {true, {Day, Start, End}};
-                _ ->
-                    false
-            end
-        end,
-        FetchDays).
-
-fmi_update_due(_Now, undefined) ->
-    true;
-fmi_update_due(Now, LastUpdate) ->
-    Now - LastUpdate >= ?FMI_INTERVAL_SECONDS.

@@ -10,6 +10,8 @@ init([]) ->
     Children = [
         {quarter_worker, {quarter_worker, start_link, []},
          permanent, 5000, worker, [quarter_worker]},
+        {hourly_worker, {hourly_worker, start_link, []},
+         permanent, 5000, worker, [hourly_worker]},
         {quarter_scheduler, {quarter_scheduler, start_link, []},
          permanent, 5000, worker, [quarter_scheduler]},
         {worker, {worker, start_link, []},
