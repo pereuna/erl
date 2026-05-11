@@ -69,7 +69,7 @@ Erlangia käytetään tai node on muuten saavutettavissa.
 * `hourly_worker` hakee FMI:n uusimmat havainnot ja ennusteen kerran tunnissa
   ilman erillistä cache/due-tarkistusta. Ennen FMI-hakua se varmistaa ENTSO-E:n
   päivän aikavälin samalla `kurl:fetch_day/1`-tarkistuksella.
-* `quarter_scheduler` ajaa edelleen illan `run.txt`-suunnittelun klo 21:41
+* `scheduler` ajaa edelleen illan `run.txt`-suunnittelun klo 21:41
   paikallista aikaa seuraavaa päivää varten.
 
 ## ENTSO/FMI run.txt -suunnittelu
@@ -99,10 +99,8 @@ kuin vanha awk-putki valmiista `prices.txt`- ja `temps.txt`-tiedostoista:
 `prices.txt`-kirjoitusta, kuten vanha `do_entso`-vaihe. `run.txt`-suunnittelu
 ei ole FMI:n tuntipäivityksen tai ENTSO:n 15 minuutin hakusilmukan osa, vaan se ajetaan
 kerran illassa klo 21:41 paikallista aikaa seuraavaa päivää varten vanhan
-crontab-esimerkin mukaisesti. Samalla kirjoitetaan `tri.txt`, joka vastaa vanhaa
-välitulostetta ja helpottaa uuden Erlang-toteutuksen vertaamista vanhaan
-awk-toteutukseen. Päiväkohtaisen
-datan oletuspolku on `/var/www/htdocs/jedi.ydns.eu/var`, mutta sen voi vaihtaa
+crontab-esimerkin mukaisesti. Päiväkohtaisen datan oletuspolku on
+`/var/www/htdocs/jedi.ydns.eu/var`, mutta sen voi vaihtaa
 ympäristömuuttujalla `QUARTER_VAR_DIR`. `P55`/`COP55`-arvoja ei enää lueta
 `const`-hakemistosta, vaan niitä muutetaan päivittämällä `entso_tables`-moduulin
 vektorit.

@@ -21,15 +21,13 @@ plan_day(PricesFile, TempsFile) ->
 
 plan_day(PricesFile, TempsFile, P55, COP55) ->
     DayDir = filename:dirname(TempsFile),
-    TriFile = filename:join(DayDir, "tri.txt"),
     RunFile = filename:join(DayDir, "run.txt"),
     Prices = prices(PricesFile),
     Temps = temps(TempsFile),
     Rows = rows(Temps, Prices, P55, COP55),
     Run = run_lines(Rows),
-    ok = file:write_file(TriFile, tri_txt(Rows)),
     ok = file:write_file(RunFile, Run),
-    {ok, #{tri => TriFile, run => RunFile, rows => length(Rows)}}.
+    {ok, #{run => RunFile, rows => length(Rows)}}.
 
 rows(Temps, Prices, P55, COP55) ->
     [row(Time, Temp, price_at(Time, Prices), P55, COP55) || {Time, Temp} <- Temps].
@@ -72,19 +70,6 @@ select_lines([Row | Rest], SumKey, Label, Acc0, Out) ->
         true -> lists:reverse(Out1);
         false -> select_lines(Rest, SumKey, Label, Acc, Out1)
     end.
-
-tri_txt(Rows) ->
-    unicode:characters_to_binary([tri_line(Row) || Row <- Rows]).
-
-tri_line(Row) ->
-    io_lib:format("~s\t~.2f\t~.2f\t~.2f\t~.2f\t~.2f~n", [
-        maps:get(time, Row),
-        maps:get(price, Row),
-        maps:get(rhinta, Row),
-        maps:get(ptarve, Row),
-        maps:get(pvarasto, Row),
-        maps:get(udiff, Row)
-    ]).
 
 temps(File) ->
     {ok, Bin} = file:read_file(File),
