@@ -88,7 +88,7 @@ prices(File) ->
 
 price_line(Line) ->
     [Time, PriceS | _] = string:lexemes(Line, " \t"),
-    {Time, parse_float(PriceS)}.
+    {Time, eutils:parse_float(PriceS)}.
 
 price_at(Time, Prices) ->
     case maps:get(Time, Prices, undefined) of
@@ -98,14 +98,6 @@ price_at(Time, Prices) ->
 
 table_value(Temp, Vector, Name) ->
     entso_tables:value(Temp, Vector, Name).
-
-parse_float(Value) ->
-    case string:to_float(Value) of
-        {Float, []} -> Float;
-        {error, no_float} ->
-            {Int, []} = string:to_integer(Value),
-            Int * 1.0
-    end.
 
 getenv(Name, Default) ->
     case os:getenv(Name) of

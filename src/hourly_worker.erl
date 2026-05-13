@@ -28,7 +28,7 @@ handle_info(_Info, State) ->
 
 handle_cast(do_work, State) ->
     TodayUtc = eutils:today_utc_string(),
-    FetchDays = fetch_days(TodayUtc, eutils:local_hour()),
+    FetchDays = eutils:fetch_days(TodayUtc, eutils:local_hour()),
     logger:info("hourly fmi fetch_days:~p", [FetchDays]),
     EntsoXmls = fetch_entso_days(FetchDays),
     Specs = fmi_day_specs(EntsoXmls),
@@ -50,11 +50,6 @@ terminate(_Reason, State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-fetch_days(TodayUtc, HourLocal) when HourLocal >= 15 ->
-    [TodayUtc, eutils:tomorrow_utc_string()];
-fetch_days(TodayUtc, _HourLocal) ->
-    [TodayUtc].
 
 fetch_entso_days(FetchDays) ->
     lists:filtermap(fun fetch_entso_day/1, FetchDays).

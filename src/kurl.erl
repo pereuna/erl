@@ -45,12 +45,12 @@ fetch_day(Day) ->
     case existing_xml_metadata(Out) of
         {ok, Metadata} ->
             ensure_prices(Out),
-            log("get_entso_xml: ~s on jo olemassa ja sisältää start-kentän, ei haeta", [Out]),
+            eutils:log(?LOG, "get_entso_xml: ~s on jo olemassa ja sisältää start-kentän, ei haeta", [Out]),
             {ok, Metadata};
         missing ->
             fetch_day(Day, Out, Tmp);
         invalid ->
-            log("get_entso_xml: ~s on olemassa mutta start-kenttä puuttuu, haetaan uudestaan", [Out]),
+            eutils:log(?LOG, "get_entso_xml: ~s on olemassa mutta start-kenttä puuttuu, haetaan uudestaan", [Out]),
             fetch_day(Day, Out, Tmp)
     end.
 
@@ -71,20 +71,20 @@ fetch_day(Day, Out, Tmp) ->
                     ok = file:rename(Tmp, Out),
                     ensure_prices(Out),
                     Metadata = Metadata0#{file => Out},
-                    log("get_entso_xml: haettu ~s", [Out]),
+                    eutils:log(?LOG, "get_entso_xml: haettu ~s", [Out]),
                     {ok, Metadata};
                 _ ->
                     _ = file:delete(Tmp),
-                    log("get_entso_xml: ERROR day=~s ladattu XML ei sisällä start-kenttää", [Day]),
+                    eutils:log(?LOG, "get_entso_xml: ERROR day=~s ladattu XML ei sisällä start-kenttää", [Day]),
                     {error, missing_start}
             end;
         {ok, {{_, Code, _}, _Headers, _Body}} ->
             _ = file:delete(Tmp),
-            log("get_entso_xml: ERROR day=~s HTTP=~p", [Day, Code]),
+            eutils:log(?LOG, "get_entso_xml: ERROR day=~s HTTP=~p", [Day, Code]),
             {error, {http_status, Code}};
         {error, Reason} ->
             _ = file:delete(Tmp),
-            log("get_entso_xml: ERROR day=~s ~p", [Day, Reason]),
+            eutils:log(?LOG, "get_entso_xml: ERROR day=~s ~p", [Day, Reason]),
             {error, Reason}
     end.
 
@@ -123,7 +123,7 @@ text_values(TextNodes) ->
 ensure_prices(EntsoXml) ->
     case xml_parse:write_prices(EntsoXml) of
         {ok, #{prices := PricesFile, rows := Rows}} ->
-            log("get_entso_xml: kirjoitettu ~s rivejä=~p", [PricesFile, Rows]),
+            eutils:log(?LOG, "get_entso_xml: kirjoitettu ~s rivejä=~p", [PricesFile, Rows]),
             ok
     end.
 
@@ -134,14 +134,3 @@ entsoe_url(Date, Api) ->
         "&timeInterval=" ++ Interval ++
         "&securityToken=" ++ Api,
     "https://" ++ ?HOST ++ "/api?" ++ Query.
-
-log(Format, Args) ->
-    Line = io_lib:format("~s " ++ Format ++ "~n", [timestamp() | Args]),
-    _ = filelib:ensure_dir(?LOG),
-    _ = file:write_file(?LOG, Line, [append]),
-    logger:info(Format, Args),
-    ok.
-
-timestamp() ->
-    {{Y, M, D}, {H, Min, S}} = calendar:local_time(),
-    lists:flatten(io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B", [Y, M, D, H, Min, S])).
