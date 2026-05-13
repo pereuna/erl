@@ -28,7 +28,7 @@ handle_info(_Info, State) ->
 
 handle_cast(do_work, State) ->
     TodayUtc = eutils:today_utc_string(),
-    FetchDays = fetch_days(TodayUtc, eutils:local_hour()),
+    FetchDays = eutils:fetch_days(TodayUtc, eutils:local_hour()),
     logger:info("qw ~p fetch_days:~p", [calendar:local_time(), FetchDays]),
     NewState = lists:foldl(fun fetch_and_store/2, State, FetchDays),
     {noreply, NewState};
@@ -45,11 +45,6 @@ terminate(_Reason, State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-fetch_days(TodayUtc, HourLocal) when HourLocal >= 15 ->
-    [TodayUtc, eutils:tomorrow_utc_string()];
-fetch_days(TodayUtc, _HourLocal) ->
-    [TodayUtc].
 
 fetch_and_store(Day, State) ->
     case kurl:fetch_day(Day) of

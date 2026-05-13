@@ -26,7 +26,7 @@ fetch_day(Day) ->
     end.
 
 fetch_day(Day, StartUtc0, EndUtc0) ->
-    fetch_day(Day, normalize_utc(StartUtc0), normalize_utc(EndUtc0), place()).
+    fetch_day(Day, eutils:normalize_utc(StartUtc0), eutils:normalize_utc(EndUtc0), place()).
 
 fetch_days(DaySpecs) ->
     Place = place(),
@@ -46,7 +46,7 @@ entso_day_spec(Day) ->
 fetch_day_spec({Day, {error, Reason}}, _Place) ->
     {Day, {error, Reason}};
 fetch_day_spec({Day, StartUtc, EndUtc}, Place) ->
-    {Day, fetch_day(Day, normalize_utc(StartUtc), normalize_utc(EndUtc), Place)}.
+    {Day, fetch_day(Day, eutils:normalize_utc(StartUtc), eutils:normalize_utc(EndUtc), Place)}.
 
 fetch_day(Day, StartUtc, EndUtc, Place) ->
     DayDir = day_dir(Day),
@@ -72,14 +72,14 @@ fetch_day(Day, StartUtc, EndUtc, Place) ->
         _ = file:delete(OldRawOut),
         Metadata = #{day => Day, place => Place, start => StartUtc, 'end' => EndUtc,
             obs_xml => ObsOut, fc_xml => FcOut, temps => TempsOut, measurements => Measurements},
-        log("fmi: päivitetty päivä=~s paikka=~s väli=~s...~s tiedosto=~s", [Day, Place, StartUtc, EndUtc, TempsOut]),
+        eutils:log(?LOG, "fmi: päivitetty päivä=~s paikka=~s väli=~s...~s tiedosto=~s", [Day, Place, StartUtc, EndUtc, TempsOut]),
         {ok, Metadata}
     catch
         Class:Reason:Stacktrace ->
             _ = file:delete(TmpObs),
             _ = file:delete(TmpFc),
             _ = file:delete(TmpTemps),
-            log("fmi: ERROR päivä=~s paikka=~s väli=~s...~s ~p:~p", [Day, Place, StartUtc, EndUtc, Class, Reason]),
+            eutils:log(?LOG, "fmi: ERROR päivä=~s paikka=~s väli=~s...~s ~p:~p", [Day, Place, StartUtc, EndUtc, Class, Reason]),
             logger:debug("fmi stacktrace: ~p", [Stacktrace]),
             {error, {Class, Reason}}
     end.
@@ -88,17 +88,6 @@ first_time(Key, Metadata) ->
     case maps:get(Key, Metadata, []) of
         [Time | _] -> Time;
         [] -> error({missing_entso_time, Key})
-    end.
-
-normalize_utc(Time) ->
-    S = string:trim(Time),
-    case {length(S), lists:suffix("Z", S)} of
-        {17, true} ->
-            lists:sublist(S, 16) ++ ":00Z";
-        {20, true} ->
-            S;
-        _ ->
-            error({invalid_utc_time, Time})
     end.
 
 place() ->
@@ -152,10 +141,10 @@ measurements(ObsXml, FcXml) ->
     Obs ++ Fc.
 
 temps_txt(Measurements, StartUtc0, EndUtc0) ->
-    StartUtc = normalize_utc(StartUtc0),
-    EndUtc = normalize_utc(EndUtc0),
-    StartEpoch = utc_to_epoch(StartUtc),
-    EndEpoch = utc_to_epoch(EndUtc),
+    StartUtc = eutils:normalize_utc(StartUtc0),
+    EndUtc = eutils:normalize_utc(EndUtc0),
+    StartEpoch = eutils:utc_to_epoch(StartUtc),
+    EndEpoch = eutils:utc_to_epoch(EndUtc),
     case EndEpoch > StartEpoch of
         true -> ok;
         false -> error({invalid_time_interval, StartUtc, EndUtc})
@@ -170,7 +159,7 @@ series(Type, Measurements) ->
         {Epoch, Temp}
         || #{type := MType, time := Time, value := Value} <- Measurements,
             MType =:= Type,
-            {ok, Epoch} <- [utc_to_epoch_safe(Time)],
+            {ok, Epoch} <- [eutils:utc_to_epoch_safe(Time)],
             {ok, Temp} <- [temperature_to_float(Value)]
     ],
     lists:sort(maps:to_list(maps:from_list(Points))).
@@ -181,10 +170,10 @@ temperature_line(Epoch, Obs, Fc) ->
         unavailable ->
             case value_at(Fc, Epoch, extrapolate) of
                 {ok, FcTemp} -> FcTemp;
-                unavailable -> error({missing_temperature, epoch_to_utc(Epoch)})
+                unavailable -> error({missing_temperature, eutils:epoch_to_utc(Epoch)})
             end
     end,
-    lists:flatten(io_lib:format("~s ~B~n", [epoch_to_utc(Epoch), round(Temp)])).
+    lists:flatten(io_lib:format("~s ~B~n", [eutils:epoch_to_utc(Epoch), round(Temp)])).
 
 value_at([], _Epoch, _Mode) ->
     unavailable;
@@ -224,29 +213,6 @@ temperature_to_float(Value0) ->
             end
     end.
 
-utc_to_epoch_safe(Time) ->
-    try {ok, utc_to_epoch(normalize_utc(Time))}
-    catch _:_ -> error
-    end.
-
-utc_to_epoch(Utc) ->
-    [Date, TimeZ] = string:split(Utc, "T"),
-    Time = string:trim(TimeZ, trailing, "Z"),
-    [YS, MS, DS] = string:split(Date, "-", all),
-    [HS, MinS, SS] = string:split(Time, ":", all),
-    DateTime = {
-        {list_to_integer(YS), list_to_integer(MS), list_to_integer(DS)},
-        {list_to_integer(HS), list_to_integer(MinS), list_to_integer(SS)}
-    },
-    calendar:datetime_to_gregorian_seconds(DateTime) - unix_epoch_gregorian_seconds().
-
-epoch_to_utc(Epoch) ->
-    {{Y, M, D}, {H, Min, S}} = calendar:gregorian_seconds_to_datetime(Epoch + unix_epoch_gregorian_seconds()),
-    lists:flatten(io_lib:format("~4..0B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ", [Y, M, D, H, Min, S])).
-
-unix_epoch_gregorian_seconds() ->
-    calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}).
-
 parse_timevaluepair(Label, File) ->
     case file:read_file_info(File) of
         {ok, #file_info{size = Size}} when Size > 0 ->
@@ -259,20 +225,5 @@ parse_timevaluepair(Label, File) ->
 
 measurement(Label, Node) ->
     #{type => Label,
-        time => xpath_string("*[local-name()='time']", Node),
-        value => xpath_string("*[local-name()='value']", Node)}.
-
-xpath_string(Path, Node) ->
-    {_, _, Value} = xmerl_xpath:string("string(" ++ Path ++ ")", Node),
-    unicode:characters_to_list(Value).
-
-log(Format, Args) ->
-    Line = io_lib:format("~s " ++ Format ++ "~n", [timestamp() | Args]),
-    _ = filelib:ensure_dir(?LOG),
-    _ = file:write_file(?LOG, Line, [append]),
-    logger:info(Format, Args),
-    ok.
-
-timestamp() ->
-    {{Y, M, D}, {H, Min, S}} = calendar:local_time(),
-    lists:flatten(io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B", [Y, M, D, H, Min, S])).
+        time => eutils:xpath_string("*[local-name()='time']", Node),
+        value => eutils:xpath_string("*[local-name()='value']", Node)}.
