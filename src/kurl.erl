@@ -13,17 +13,19 @@
 
 apikey() ->
     case os:getenv("ENTSOE_API_KEY") of
-        false ->
-            case os:getenv("API") of
-                false -> error({missing_env, "ENTSOE_API_KEY"});
-                "" -> error({empty_env, "API"});
-                Api -> {api_key, Api}
-            end;
-        "" ->
-            error({empty_env, "ENTSOE_API_KEY"});
-        ApiKey ->
-            {api_key, ApiKey}
+        false -> error({missing_env, "ENTSOE_API_KEY"});
+        "" -> error({empty_env, "ENTSOE_API_KEY"});
+        ApiKey -> {api_key, ApiKey}
     end.
+
+%% Backwards-compatible API: fetch the ENTSO-E page and return HTTP status/body.
+getpage(Date) ->
+    {api_key, Api} = apikey(),
+    application:ensure_all_started(ssl),
+    application:ensure_all_started(inets),
+    Url = entsoe_url(Date, Api),
+    {ok, {{_, Code, _}, _, CodeBase}} = httpc:request(Url),
+    {ok, Code, CodeBase}.
 
 %% Fetch one UTC day into /var/www/.../var/YYYY/MM/DD/entso.xml.
 %% entso_st.txt and entso_end.txt are intentionally not written anymore;
