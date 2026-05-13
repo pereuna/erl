@@ -25,15 +25,6 @@ apikey() ->
             {api_key, ApiKey}
     end.
 
-%% Backwards-compatible API: fetch the ENTSO-E page and return HTTP status/body.
-getpage(Date) ->
-    {api_key, Api} = apikey(),
-    application:ensure_all_started(ssl),
-    application:ensure_all_started(inets),
-    Url = entsoe_url(Date, Api),
-    {ok, {{_, Code, _}, _, CodeBase}} = httpc:request(Url),
-    {ok, Code, CodeBase}.
-
 %% Fetch one UTC day into /var/www/.../var/YYYY/MM/DD/entso.xml.
 %% entso_st.txt and entso_end.txt are intentionally not written anymore;
 %% their values are returned as Erlang data in the metadata map.
