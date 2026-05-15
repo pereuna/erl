@@ -7,6 +7,7 @@
 -define(DEFAULT_GPIO_DEVICE, "gpio0").
 -define(DEFAULT_PUMP_PIN, 26).
 -define(DEFAULT_CONTROL_PIN, 20).
+-define(GPIO_COMMAND, "/usr/sbin/gpioctl").
 
 %% API: varttiajastimesta kutsuttava työ.
 do_work() ->
@@ -65,20 +66,9 @@ apply_action(discharge) ->
     set_outputs(0, 1).
 
 set_outputs(PumpValue, ControlValue) ->
-    case gpio_command() of
-        {ok, Command} ->
-            case run_gpio(Command, ?DEFAULT_GPIO_DEVICE, ?DEFAULT_PUMP_PIN, PumpValue) of
-                ok -> run_gpio(Command, ?DEFAULT_GPIO_DEVICE, ?DEFAULT_CONTROL_PIN, ControlValue);
-                Error -> Error
-            end;
-        Error ->
-            Error
-    end.
-
-gpio_command() ->
-    case os:find_executable("gpioctl") of
-        false -> {error, {gpio_command_not_found, "gpioctl"}};
-        Path -> {ok, Path}
+    case run_gpio(?GPIO_COMMAND, ?DEFAULT_GPIO_DEVICE, ?DEFAULT_PUMP_PIN, PumpValue) of
+        ok -> run_gpio(?GPIO_COMMAND, ?DEFAULT_GPIO_DEVICE, ?DEFAULT_CONTROL_PIN, ControlValue);
+        Error -> Error
     end.
 
 run_gpio(Command, Device, Pin, Value) ->
