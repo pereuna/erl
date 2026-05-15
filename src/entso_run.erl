@@ -2,7 +2,7 @@
 %% Laskee vanhan /rc/trilogy.rc + trilogy-awk -ketjun tuottaman run.txt-suunnitelman.
 -module(entso_run).
 
--export([plan_day/1, plan_day/2, plan_day/4, control_plan/1, action_for_time/1]).
+-export([plan_day/1, control_plan/1, action_for_time/1]).
 
 -define(DEFAULT_VAR_DIR, "/var/www/htdocs/jedi.ydns.eu/var").
 -define(VVARAAJA, 2.0).
@@ -11,29 +11,19 @@
 plan_day(Day) ->
     VarDir = getenv("QUARTER_VAR_DIR", ?DEFAULT_VAR_DIR),
     DayDir = filename:join([VarDir | string:split(Day, "-", all)]),
-    plan_day_files(
-        filename:join(DayDir, "prices.txt"),
-        filename:join(DayDir, "temps.txt"),
-        filename:join(DayDir, "run.txt")
-    ).
-
-plan_day(PricesFile, TempsFile) ->
-    DayDir = filename:dirname(TempsFile),
-    plan_day_files(
+    PricesFile = filename:join(DayDir, "prices.txt"),
+    TempsFile = filename:join(DayDir, "temps.txt"),
+    RunLogFile = filename:join(DayDir, "run.txt"),
+    case build_plan_files(
         PricesFile,
         TempsFile,
-        filename:join(DayDir, "run.txt")
-    ).
-
-plan_day(PricesFile, TempsFile, P55, COP55) ->
-    DayDir = filename:dirname(TempsFile),
-    plan_day_files(
-        PricesFile,
-        TempsFile,
-        filename:join(DayDir, "run.txt"),
-        P55,
-        COP55
-    ).
+        RunLogFile,
+        entso_tables:p55(),
+        entso_tables:cop55()
+    ) of
+        {ok, Metadata, _Plan} -> {ok, Metadata};
+        {error, Reason} -> {error, Reason}
+    end.
 
 action_for_time(TimeUtc) ->
     [Day, _Time] = string:split(TimeUtc, "T"),
@@ -47,15 +37,6 @@ action_for_time(TimeUtc) ->
         entso_tables:cop55()
     ) of
         {ok, _Metadata, Plan} -> {ok, maps:get(TimeUtc, Plan, normal)};
-        {error, Reason} -> {error, Reason}
-    end.
-
-plan_day_files(PricesFile, TempsFile, RunLogFile) ->
-    plan_day_files(PricesFile, TempsFile, RunLogFile, entso_tables:p55(), entso_tables:cop55()).
-
-plan_day_files(PricesFile, TempsFile, RunLogFile, P55, COP55) ->
-    case build_plan_files(PricesFile, TempsFile, RunLogFile, P55, COP55) of
-        {ok, Metadata, _Plan} -> {ok, Metadata};
         {error, Reason} -> {error, Reason}
     end.
 
