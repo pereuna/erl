@@ -135,8 +135,7 @@ kirjoitetaan siitä lokiksi:
 `prices.txt`-kirjoitusta, kuten vanha `do_entso`-vaihe. `run.txt`-suunnittelu
 ei ole FMI:n tuntipäivityksen tai ENTSO:n 15 minuutin hakusilmukan osa, vaan se ajetaan
 kerran illassa klo 21:41 paikallista aikaa seuraavaa päivää varten vanhan
-crontab-esimerkin mukaisesti. Päiväkohtaisen datan oletuspolku on
-`/var/www/htdocs/jedi.ydns.eu/var`, mutta sen voi vaihtaa
-ympäristömuuttujalla `QUARTER_VAR_DIR`. `P55`/`COP55`-arvoja ei enää lueta
+crontab-esimerkin mukaisesti. Päiväkohtaisen datan polku on aina
+`/var/www/htdocs/jedi.ydns.eu/var`. `P55`/`COP55`-arvoja ei enää lueta
 `const`-hakemistosta, vaan niitä muutetaan päivittämällä `entso_tables`-moduulin
 vektorit.
