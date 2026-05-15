@@ -28,7 +28,6 @@ fetch_day(Day) ->
     ok = filelib:ensure_dir(filename:join(DayDir, "dummy")),
     case existing_xml_metadata(Out) of
         {ok, Metadata} ->
-            ensure_prices(Out),
             eutils:log(?LOG, "get_entso_xml: ~s on jo olemassa ja sisältää start-kentän, ei haeta", [Out]),
             {ok, Metadata};
         missing ->
@@ -53,7 +52,7 @@ fetch_day(Day, Out, Tmp) ->
             case existing_xml_metadata(Tmp) of
                 {ok, Metadata0} ->
                     ok = file:rename(Tmp, Out),
-                    ensure_prices(Out),
+                    xml_parse:write_prices(Out),
                     Metadata = Metadata0#{file => Out},
                     eutils:log(?LOG, "get_entso_xml: haettu ~s", [Out]),
                     {ok, Metadata};
@@ -103,13 +102,6 @@ xml_metadata(File) ->
 
 text_values(TextNodes) ->
     [unicode:characters_to_list(Value) || #xmlText{value = Value} <- TextNodes].
-
-ensure_prices(EntsoXml) ->
-    case xml_parse:write_prices(EntsoXml) of
-        {ok, #{prices := PricesFile, rows := Rows}} ->
-            eutils:log(?LOG, "get_entso_xml: kirjoitettu ~s rivejä=~p", [PricesFile, Rows]),
-            ok
-    end.
 
 entsoe_url(Date, Api) ->
     Interval = Date ++ "T09%3A00Z%2F" ++ Date ++ "T15%3A00Z",
