@@ -3,7 +3,7 @@
 
 -include_lib("kernel/include/file.hrl").
 -include_lib("xmerl/include/xmerl.hrl").
--export([fetch_day/1, getpage/1]).
+-export([fetch_day/1]).
 
 -define(HOST, "web-api.tp.entsoe.eu").
 -define(DOM, "10YFI-1--------U").
