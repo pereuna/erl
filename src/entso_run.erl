@@ -79,8 +79,8 @@ rows(Temps, Prices, P55, COP55) ->
     [row(Time, Temp, price_at(Time, Prices), P55, COP55) || {Time, Temp} <- Temps].
 
 row(Time, Temp, Price, P55, COP55) ->
-    P55Value = table_value(Temp, P55, "P55"),
-    COP55Value = table_value(Temp, COP55, "COP55"),
+    P55Value = maps:get(Temp, P55),
+    COP55Value = maps:get(Temp, COP55),
     Rhinta = ((Price + 63.3) * 1.24) / COP55Value,
     Ptarve = -0.2 * Temp + 6,
     Pvarasto = P55Value - Ptarve,
@@ -155,9 +155,6 @@ price_at(Time, Prices) ->
         undefined -> error({missing_price, Time});
         Price -> Price
     end.
-
-table_value(Temp, Vector, Name) ->
-    entso_tables:value(Temp, Vector, Name).
 
 getenv(Name, Default) ->
     case os:getenv(Name) of
