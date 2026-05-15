@@ -26,11 +26,10 @@ fetch_day(Day) ->
     end.
 
 fetch_day(Day, StartUtc0, EndUtc0) ->
-    fetch_day(Day, eutils:normalize_utc(StartUtc0), eutils:normalize_utc(EndUtc0), place()).
+    fetch_day(Day, eutils:normalize_utc(StartUtc0), eutils:normalize_utc(EndUtc0), ?DEFAULT_PLACE).
 
 fetch_days(DaySpecs) ->
-    Place = place(),
-    [fetch_day_spec(DaySpec, Place) || DaySpec <- DaySpecs].
+    [fetch_day_spec(DaySpec, ?DEFAULT_PLACE) || DaySpec <- DaySpecs].
 
 fetch_days_from_entso(Days) ->
     fetch_days([entso_day_spec(Day) || Day <- Days]).
@@ -88,13 +87,6 @@ first_time(Key, Metadata) ->
     case maps:get(Key, Metadata, []) of
         [Time | _] -> Time;
         [] -> error({missing_entso_time, Key})
-    end.
-
-place() ->
-    case os:getenv("FMI_PLACE") of
-        false -> ?DEFAULT_PLACE;
-        "" -> ?DEFAULT_PLACE;
-        Place -> Place
     end.
 
 day_dir(Day) ->

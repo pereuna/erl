@@ -99,8 +99,8 @@ on `charge` tai `discharge`. Jos avainta ei löydy, toiminto on `normal`.
 
 Erillistä `run.plan`-tiedostoa tai muuta pysyvää ohjaustaulua ei kirjoiteta,
 koska suunnitelma voidaan aina muodostaa uudestaan levyllä olevista sää- ja
-hintatiedoista. GPIO-asetukset voi muuttaa muuttujilla `TRIG_GPIO_COMMAND`,
-`TRIG_GPIO_DEVICE`, `TRIG_PUMP_PIN` ja `TRIG_CONTROL_PIN`.
+hintatiedoista. GPIO-ohjaus käyttää kiinteästi OpenBSD:n `gpioctl`-komentoa,
+`gpio0`-laitetta sekä pinnejä 26 ja 20.
 
 ## ENTSO/FMI run.txt -suunnittelu
 
