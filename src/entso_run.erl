@@ -9,8 +9,7 @@
 -define(U, 1.17).
 
 plan_day(Day) ->
-    VarDir = getenv("QUARTER_VAR_DIR", ?DEFAULT_VAR_DIR),
-    DayDir = filename:join([VarDir | string:split(Day, "-", all)]),
+    DayDir = day_dir(Day),
     PricesFile = filename:join(DayDir, "prices.txt"),
     TempsFile = filename:join(DayDir, "temps.txt"),
     RunLogFile = filename:join(DayDir, "run.txt"),
@@ -27,8 +26,7 @@ plan_day(Day) ->
 
 action_for_time(TimeUtc) ->
     [Day, _Time] = string:split(TimeUtc, "T"),
-    VarDir = getenv("QUARTER_VAR_DIR", ?DEFAULT_VAR_DIR),
-    DayDir = filename:join([VarDir | string:split(Day, "-", all)]),
+    DayDir = day_dir(Day),
     case build_plan_files(
         filename:join(DayDir, "prices.txt"),
         filename:join(DayDir, "temps.txt"),
@@ -137,9 +135,5 @@ price_at(Time, Prices) ->
         Price -> Price
     end.
 
-getenv(Name, Default) ->
-    case os:getenv(Name) of
-        false -> Default;
-        "" -> Default;
-        Value -> Value
-    end.
+day_dir(Day) ->
+    filename:join([?DEFAULT_VAR_DIR | string:split(Day, "-", all)]).
