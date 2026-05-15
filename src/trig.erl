@@ -67,11 +67,8 @@ apply_action(discharge) ->
 set_outputs(PumpValue, ControlValue) ->
     case gpio_command() of
         {ok, Command} ->
-            Device = getenv("TRIG_GPIO_DEVICE", ?DEFAULT_GPIO_DEVICE),
-            PumpPin = getenv_int("TRIG_PUMP_PIN", ?DEFAULT_PUMP_PIN),
-            ControlPin = getenv_int("TRIG_CONTROL_PIN", ?DEFAULT_CONTROL_PIN),
-            case run_gpio(Command, Device, PumpPin, PumpValue) of
-                ok -> run_gpio(Command, Device, ControlPin, ControlValue);
+            case run_gpio(Command, ?DEFAULT_GPIO_DEVICE, ?DEFAULT_PUMP_PIN, PumpValue) of
+                ok -> run_gpio(Command, ?DEFAULT_GPIO_DEVICE, ?DEFAULT_CONTROL_PIN, ControlValue);
                 Error -> Error
             end;
         Error ->
@@ -79,13 +76,9 @@ set_outputs(PumpValue, ControlValue) ->
     end.
 
 gpio_command() ->
-    case getenv("TRIG_GPIO_COMMAND", "gpioctl") of
-        "" -> {error, empty_gpio_command};
-        Command ->
-            case os:find_executable(Command) of
-                false -> {error, {gpio_command_not_found, Command}};
-                Path -> {ok, Path}
-            end
+    case os:find_executable("gpioctl") of
+        false -> {error, {gpio_command_not_found, "gpioctl"}};
+        Path -> {ok, Path}
     end.
 
 run_gpio(Command, Device, Pin, Value) ->
@@ -105,16 +98,4 @@ collect_gpio_result(Port, Acc) ->
     after 30000 ->
         port_close(Port),
         {error, gpio_timeout}
-    end.
-
-getenv(Name, Default) ->
-    case os:getenv(Name) of
-        false -> Default;
-        Value -> Value
-    end.
-
-getenv_int(Name, Default) ->
-    case getenv(Name, "") of
-        "" -> Default;
-        Value -> list_to_integer(Value)
     end.
