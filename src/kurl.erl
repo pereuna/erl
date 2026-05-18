@@ -27,18 +27,12 @@ fetch_day(Day) ->
     ok = filelib:ensure_dir(filename:join(DayDir, "dummy")),
     case existing_xml_metadata(Out) of
         {ok, Metadata} ->
-            logger:info(
-                "get_entso_xml: ~s on jo olemassa ja sisältää start-kentän, ei haeta",
-                [Out]
-            ),
+            logger:info("get_entso_xml: ~s on jo olemassa ja sisältää start-kentän, ei haeta", [Out]),
             {ok, Metadata};
         missing ->
             fetch_day(Day, Out, Tmp);
         invalid ->
-            logger:info(
-                "get_entso_xml: ~s on olemassa mutta start-kenttä puuttuu, haetaan uudestaan",
-                [Out]
-            ),
+            logger:info("get_entso_xml: ~s on olemassa mutta start-kenttä puuttuu, haetaan uudestaan", [Out]),
             fetch_day(Day, Out, Tmp)
     end.
 
