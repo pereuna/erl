@@ -55,7 +55,8 @@ pakkaa mukaan kyseisen koneen Erlang-runtimen.
 
 ### Asetukset
 
-* `config/sys.config` määrittää Erlang loggerin kirjoittamaan standard outputiin.
+* `config/sys.config` määrittää Erlang loggerin kirjoittamaan yhteiseen lokiin
+  `/var/www/htdocs/jedi.ydns.eu/volatile/quarter.log`.
 * `config/vm.args` määrittää paikallisen noden nimen ja kehityscookien.
 
 Vaihda `config/vm.args`-tiedoston cookie ennen tuotantokäyttöä, jos distributed

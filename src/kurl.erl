@@ -9,7 +9,6 @@
 -define(DOM, "10YFI-1--------U").
 -define(PX, "/var/www/htdocs/jedi.ydns.eu/var").
 -define(VOL, "/var/www/htdocs/jedi.ydns.eu/volatile").
--define(LOG, "/var/www/htdocs/jedi.ydns.eu/volatile/entso.log").
 
 apikey() ->
     case os:getenv("ENTSOE_API_KEY") of
@@ -28,12 +27,18 @@ fetch_day(Day) ->
     ok = filelib:ensure_dir(filename:join(DayDir, "dummy")),
     case existing_xml_metadata(Out) of
         {ok, Metadata} ->
-            eutils:log(?LOG, "get_entso_xml: ~s on jo olemassa ja sisältää start-kentän, ei haeta", [Out]),
+            logger:info(
+                "get_entso_xml: ~s on jo olemassa ja sisältää start-kentän, ei haeta",
+                [Out]
+            ),
             {ok, Metadata};
         missing ->
             fetch_day(Day, Out, Tmp);
         invalid ->
-            eutils:log(?LOG, "get_entso_xml: ~s on olemassa mutta start-kenttä puuttuu, haetaan uudestaan", [Out]),
+            logger:info(
+                "get_entso_xml: ~s on olemassa mutta start-kenttä puuttuu, haetaan uudestaan",
+                [Out]
+            ),
             fetch_day(Day, Out, Tmp)
     end.
 
@@ -54,20 +59,23 @@ fetch_day(Day, Out, Tmp) ->
                     ok = file:rename(Tmp, Out),
                     xml_parse:write_prices(Out),
                     Metadata = Metadata0#{file => Out},
-                    eutils:log(?LOG, "get_entso_xml: haettu ~s", [Out]),
+                    logger:info("get_entso_xml: haettu ~s", [Out]),
                     {ok, Metadata};
                 _ ->
                     _ = file:delete(Tmp),
-                    eutils:log(?LOG, "get_entso_xml: ERROR day=~s ladattu XML ei sisällä start-kenttää", [Day]),
+                    logger:info(
+                        "get_entso_xml: ERROR day=~s ladattu XML ei sisällä start-kenttää",
+                        [Day]
+                    ),
                     {error, missing_start}
             end;
         {ok, {{_, Code, _}, _Headers, _Body}} ->
             _ = file:delete(Tmp),
-            eutils:log(?LOG, "get_entso_xml: ERROR day=~s HTTP=~p", [Day, Code]),
+            logger:info("get_entso_xml: ERROR day=~s HTTP=~p", [Day, Code]),
             {error, {http_status, Code}};
         {error, Reason} ->
             _ = file:delete(Tmp),
-            eutils:log(?LOG, "get_entso_xml: ERROR day=~s ~p", [Day, Reason]),
+            logger:info("get_entso_xml: ERROR day=~s ~p", [Day, Reason]),
             {error, Reason}
     end.
 
