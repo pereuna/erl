@@ -17,9 +17,7 @@
     utc_to_epoch_safe/1,
     epoch_to_utc/1,
     parse_float/1,
-    xpath_string/2,
-    log/3,
-    timestamp/0
+    xpath_string/2
 ]).
 
 tomorrow_date() ->
@@ -121,14 +119,3 @@ parse_float(Value) ->
 xpath_string(Path, Node) ->
     {_, _, Value} = xmerl_xpath:string("string(" ++ Path ++ ")", Node),
     unicode:characters_to_list(Value).
-
-log(LogFile, Format, Args) ->
-    Line = io_lib:format("~s " ++ Format ++ "~n", [timestamp() | Args]),
-    _ = filelib:ensure_dir(LogFile),
-    _ = file:write_file(LogFile, Line, [append]),
-    logger:info(Format, Args),
-    ok.
-
-timestamp() ->
-    {{Y, M, D}, {H, Min, S}} = calendar:local_time(),
-    lists:flatten(io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B", [Y, M, D, H, Min, S])).

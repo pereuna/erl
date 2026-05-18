@@ -33,7 +33,6 @@ handle_cast(do_work, State) ->
     EntsoXmls = fetch_entso_days(FetchDays),
     Specs = fmi_day_specs(EntsoXmls),
     Results = fetch_fmi(Specs),
-    logger:info("hourly fmi update results: ~p", [Results]),
     {noreply, State#{entso_xml => EntsoXmls, fmi_results => Results}};
 
 handle_cast(_Msg, State) ->

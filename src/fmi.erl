@@ -11,7 +11,6 @@
 -define(DEFAULT_PLACE, "Pihlava").
 -define(PX, "/var/www/htdocs/jedi.ydns.eu/var").
 -define(VOL, "/var/www/htdocs/jedi.ydns.eu/volatile").
--define(LOG, "/var/www/htdocs/jedi.ydns.eu/volatile/fmi.log").
 
 %% Fetch current day and next day using the same start/end values that ENTSO XML contains.
 fetch_today_and_tomorrow() ->
@@ -71,14 +70,20 @@ fetch_day(Day, StartUtc, EndUtc, Place) ->
         _ = file:delete(OldRawOut),
         Metadata = #{day => Day, place => Place, start => StartUtc, 'end' => EndUtc,
             obs_xml => ObsOut, fc_xml => FcOut, temps => TempsOut, measurements => Measurements},
-        eutils:log(?LOG, "fmi: päivitetty päivä=~s paikka=~s väli=~s...~s tiedosto=~s", [Day, Place, StartUtc, EndUtc, TempsOut]),
+        logger:info(
+            "fmi: päivitetty päivä=~s paikka=~s väli=~s...~s tiedosto=~s",
+            [Day, Place, StartUtc, EndUtc, TempsOut]
+        ),
         {ok, Metadata}
     catch
         Class:Reason:Stacktrace ->
             _ = file:delete(TmpObs),
             _ = file:delete(TmpFc),
             _ = file:delete(TmpTemps),
-            eutils:log(?LOG, "fmi: ERROR päivä=~s paikka=~s väli=~s...~s ~p:~p", [Day, Place, StartUtc, EndUtc, Class, Reason]),
+            logger:info(
+                "fmi: ERROR päivä=~s paikka=~s väli=~s...~s ~p:~p",
+                [Day, Place, StartUtc, EndUtc, Class, Reason]
+            ),
             logger:debug("fmi stacktrace: ~p", [Stacktrace]),
             {error, {Class, Reason}}
     end.
