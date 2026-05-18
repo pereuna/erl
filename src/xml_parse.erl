@@ -30,17 +30,26 @@ period_prices(Period) ->
     PointNodes = xmerl_xpath:string("*[local-name()='Point']", Period),
     Points = lists:sort([{pos_int(Node), price_float(Node)} || Node <- PointNodes]),
     Count = max(0, (EndEpoch - StartEpoch) div ?QUARTSEC),
-    Filled = fill_gaps(Points, 1, Count, 0.0),
+    Filled = fill_gaps(Points, 1, Count),
     [{eutils:epoch_to_utc(StartEpoch + (Pos - 1) * ?QUARTSEC), Price} || {Pos, Price} <- Filled].
 
-fill_gaps(_Points, N, Count, _LastPrice) when N > Count ->
+%% trampoline because a first price is always N=1
+fill_gaps([{N, Price} | Rest], N, Count) ->
+    [{N, Price} | fill_gaps(Rest, N + 1, Count, Price)].
+
+%% list end
+fill_gaps(_Pairs, N, Count, _LastPrice) when N > Count ->
     [];
+
+%% N=N clear lines
 fill_gaps([{N, Price} | Rest], N, Count, _LastPrice) ->
     [{N, Price} | fill_gaps(Rest, N + 1, Count, Price)];
-fill_gaps([{Pos, _Price} | _] = Points, N, Count, LastPrice) when Pos > N ->
-    [{N, LastPrice} | fill_gaps(Points, N + 1, Count, LastPrice)];
-fill_gaps([{_Pos, Price} | Rest], N, Count, _LastPrice) ->
-    fill_gaps(Rest, N, Count, Price);
+
+%% if missing position
+fill_gaps([{Pos, _Price} | _Rest] = Pairs, N, Count, LastPrice) when N < Pos ->
+    [{N, LastPrice} | fill_gaps(Pairs, N + 1, Count, LastPrice)];
+
+%% if list end has no positions
 fill_gaps([], N, Count, LastPrice) ->
     [{N, LastPrice} | fill_gaps([], N + 1, Count, LastPrice)].
 
