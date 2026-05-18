@@ -74,8 +74,9 @@ Erlangia käytetään tai node on muuten saavutettavissa.
   jo haettu ja kelvollinen, sitä käytetään; muuten se haetaan. Klo 15:00 jälkeen
   sama tarkistus tehdään myös seuraavalle päivälle.
 * `hourly_worker` hakee FMI:n uusimmat havainnot ja ennusteen kerran tunnissa
-  ilman erillistä cache/due-tarkistusta. Ennen FMI-hakua se varmistaa ENTSO-E:n
-  päivän aikavälin samalla `kurl:fetch_day/1`-tarkistuksella.
+  ilman erillistä cache/due-tarkistusta. Ennen FMI-hakua se lukee ENTSO-E:n
+  päivän aikavälin `quarter_worker`in ylläpitämästä tilasta eikä käynnistä omaa
+  ENTSO-E-hakua.
 * `daily_run_worker` ajaa illan `run.txt`-suunnittelun klo 21:41 paikallista
   aikaa seuraavaa päivää varten.
 

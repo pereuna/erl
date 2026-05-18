@@ -6,7 +6,6 @@
 -export([start_link/0, do_work/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(entso_xml, {day, file, start = [], 'end' = []}).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -51,29 +50,22 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 fetch_entso_days(FetchDays) ->
-    lists:filtermap(fun fetch_entso_day/1, FetchDays).
+    EntsoXmls = quarter_worker:entso_metadata(FetchDays),
+    log_missing_entso_days(FetchDays, EntsoXmls),
+    EntsoXmls.
 
-fetch_entso_day(Day) ->
-    case kurl:fetch_day(Day) of
-        {ok, Metadata} ->
-            {true, #entso_xml{
-                day = Day,
-                file = maps:get(file, Metadata),
-                start = maps:get(start, Metadata, []),
-                'end' = maps:get('end', Metadata, [])
-            }};
-        {error, Reason} ->
-            logger:error("hourly fmi entso check failed: day=~s reason=~p", [Day, Reason]),
-            false
-    end.
+log_missing_entso_days(FetchDays, EntsoXmls) ->
+    FoundDays = [maps:get(day, EntsoXml) || EntsoXml <- EntsoXmls],
+    MissingDays = FetchDays -- FoundDays,
+    [logger:warning("hourly fmi entso metadata missing from state: day=~s", [Day]) || Day <- MissingDays],
+    ok.
 
 fmi_day_specs(EntsoXmls) ->
     lists:filtermap(
-        fun
-            (#entso_xml{day = Day, start = [Start | _], 'end' = [End | _]}) ->
-                {true, {Day, Start, End}};
-            (_) ->
-                false
+        fun(#{day := Day, start := [Start | _], 'end' := [End | _]}) ->
+            {true, {Day, Start, End}};
+           (_) ->
+            false
         end,
         EntsoXmls).
 
