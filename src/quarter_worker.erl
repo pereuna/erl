@@ -2,7 +2,7 @@
 %% Vartin välein ajettava koordinaattori: trig GPIO-ohjaus ja ENTSO-E-tarkistus.
 -module(quarter_worker).
 -behaviour(gen_server).
--export([start_link/0, do_work/0]).
+-export([start_link/0, do_work/0, entso_metadata/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 start_link() ->
@@ -11,6 +11,9 @@ start_link() ->
 %% API: voidaan kutsua myös käsin tarvittaessa.
 do_work() ->
     gen_server:cast(?MODULE, do_work).
+
+entso_metadata(Days) ->
+    gen_server:call(?MODULE, {entso_metadata, Days}).
 
 %% gen_server callbacks
 init([]) ->
@@ -33,6 +36,10 @@ handle_cast(do_work, State) ->
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+handle_call({entso_metadata, Days}, _From, State) ->
+    EntsoState = maps:get(entso_quarter, State, entso_quarter:init_state()),
+    {reply, entso_quarter:metadata_for_days(Days, EntsoState), State};
 
 handle_call(_Req, _From, State) ->
     {reply, ok, State}.

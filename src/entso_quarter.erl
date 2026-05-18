@@ -2,12 +2,24 @@
 %% ENTSO-E:n varttitarkistus, jonka periodinen ajo on quarter_workerissa.
 -module(entso_quarter).
 
--export([init_state/0, do_work/1]).
+-export([init_state/0, do_work/1, metadata_for_days/2]).
 
 -record(entso_xml, {day, file, start = [], 'end' = []}).
 
 init_state() ->
     #{entso_xml => #{}}.
+
+metadata_for_days(Days, State) ->
+    EntsoByDay = maps:get(entso_xml, State, #{}),
+    lists:filtermap(fun(Day) -> metadata_for_day(Day, EntsoByDay) end, Days).
+
+metadata_for_day(Day, EntsoByDay) ->
+    case maps:find(Day, EntsoByDay) of
+        {ok, #entso_xml{file = File, start = Start, 'end' = End}} ->
+            {true, #{day => Day, file => File, start => Start, 'end' => End}};
+        error ->
+            false
+    end.
 
 %% Tarkistaa ENTSO-E XML:t vartin välein. Jos päivän entso.xml on jo olemassa
 %% ja kelvollinen, kurl:fetch_day/1 käyttää sitä eikä tee turhaa HTTP-hakua.
