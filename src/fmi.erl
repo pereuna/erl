@@ -10,7 +10,6 @@
 -define(BASE_URL, "https://opendata.fmi.fi/wfs").
 -define(DEFAULT_PLACE, "Pihlava").
 -define(PX, "/var/www/htdocs/jedi.ydns.eu/var").
--define(VOL, "/var/www/htdocs/jedi.ydns.eu/volatile").
 
 %% Fetch current day and next day using the same start/end values that ENTSO XML contains.
 fetch_today_and_tomorrow() ->
@@ -52,11 +51,10 @@ fetch_day(Day, StartUtc, EndUtc, Place) ->
     FcOut = filename:join(DayDir, "fmi_fc.xml"),
     TempsOut = filename:join(DayDir, "temps.txt"),
     OldRawOut = filename:join(DayDir, "fmi_raw.tsv"),
-    TmpObs = filename:join(?VOL, ".fmi_obs_" ++ Day ++ ".xml.tmp"),
-    TmpFc = filename:join(?VOL, ".fmi_fc_" ++ Day ++ ".xml.tmp"),
-    TmpTemps = filename:join(?VOL, ".temps_" ++ Day ++ ".txt.tmp"),
+    TmpObs = filename:join(DayDir, ".fmi_obs.xml.tmp"),
+    TmpFc = filename:join(DayDir, ".fmi_fc.xml.tmp"),
+    TmpTemps = filename:join(DayDir, ".temps.txt.tmp"),
     ok = filelib:ensure_dir(filename:join(DayDir, "dummy")),
-    ok = filelib:ensure_dir(filename:join(?VOL, "dummy")),
     ObsUrl = fmi_url("fmi::observations::weather::timevaluepair", Place, "t2m", StartUtc, EndUtc),
     FcUrl = fmi_url("fmi::forecast::harmonie::surface::point::timevaluepair", Place, "Temperature", StartUtc, EndUtc),
     try

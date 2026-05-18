@@ -8,7 +8,6 @@
 -define(HOST, "web-api.tp.entsoe.eu").
 -define(DOM, "10YFI-1--------U").
 -define(PX, "/var/www/htdocs/jedi.ydns.eu/var").
--define(VOL, "/var/www/htdocs/jedi.ydns.eu/volatile").
 
 apikey() ->
     case os:getenv("ENTSOE_API_KEY") of
@@ -23,7 +22,7 @@ apikey() ->
 fetch_day(Day) ->
     DayDir = filename:join([?PX | string:split(Day, "-", all)]),
     Out = filename:join(DayDir, "entso.xml"),
-    Tmp = filename:join(?VOL, "." ++ Day ++ ".xml.tmp"),
+    Tmp = filename:join(DayDir, ".entso.xml.tmp"),
     ok = filelib:ensure_dir(filename:join(DayDir, "dummy")),
     case existing_xml_metadata(Out) of
         {ok, Metadata} ->
