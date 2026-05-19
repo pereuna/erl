@@ -94,14 +94,12 @@ Erlang-tarkistuksella. Moduuli muodostaa nykyisen UTC-vartin ajan muodossa
 `YYYY-MM-DDTHH:MM:00Z`. Sen jälkeen se koostaa kyseisen päivän ohjaustaulun
 levyllä olevista `prices.txt`- ja `temps.txt`-tiedostoista `entso_run`-moduulin
 kautta. Ohjaustaulu on Erlangin `map`, jossa avain on vartin kellonaika ja arvo
-on `charge` tai `discharge`. Jos avainta ei löydy, toiminto on `normal`.
+on `discharge`. Jos avainta ei löydy, toiminto on `normal`.
 `run.txt` kirjoitetaan samalla uudestaan vain ihmisen luettavaksi lokiksi.
 `trig` ajaa OpenBSD:n `gpioctl`-komennot:
 
 * ei riviä: pumppu päälle ja normaali säätö päälle (`gpioctl gpio0 26 1`,
   `gpioctl gpio0 20 1`)
-* rivillä `L`: varaajan lataus päälle, pumppu päälle ja pyynti 55 °C
-  (`gpioctl gpio0 26 1`, `gpioctl gpio0 20 0`)
 * rivillä `P`: purku päälle, pumppu pois ja normaali säätö päälle
   (`gpioctl gpio0 26 0`, `gpioctl gpio0 20 1`)
 
@@ -121,29 +119,28 @@ Varsinainen ohjaustaulu pidetään vain laskennan tuloksena muistissa, ja `run.t
 kirjoitetaan siitä lokiksi:
 
 1. `prices.txt` antaa varttihinnat ja `temps.txt` antaa vastaavat ulkolämpötilat.
-2. `P55` ja `COP55` haetaan Erlangin sisäisistä vektoreista moduulista
-   `entso_tables`; vektorin elementti 1 vastaa lämpötilaa -20 °C, eli vanhan
-   `FNR-21`-indeksoinnin.
-3. Jokaiselle vartille lasketaan:
-   * suhteellinen hinta: `((hinta + 63.3) * 1.24) / COP55[T]`
+2. Menoveden pyynti lasketaan normal-tilassa säätökäyrällä
+   `-0.0067*T*T - 0.9*T + 42.7` (rajattu välille 25..60 °C).
+3. `P` ja `COP` lasketaan menoveden ja ulkolämpötilan funktiona moduulissa
+   `entso_tables` (55 °C taulukoista johdettu yleistys).
+4. Jokaiselle vartille lasketaan:
+   * suhteellinen hinta: `((hinta + 63.3) * 1.24) / COP(T, Tmeno)`
    * tehontarve: `-0.2 * T + 6`
-   * varastoon jäävä teho: `P55[T] - tehontarve`
-   * varaajan energiakynnys: `(55 - (-0.0067*T - 0.9*T + 42.7)) * 2 * 1.17`
-4. Ohjaussuunnitelma muodostetaan Erlangin `map`-taulukoksi, jossa avain on
-   vartin UTC-aika ja arvo on `charge` tai `discharge`:
-   * halvimmat vartit nousevan suhteellisen hinnan järjestyksessä merkitään
-     arvolla `charge`, kunnes kumulatiivinen varastoteho ylittää kyseisen rivin
-     energiakynnyksen
-   * kalleimmat vartit laskevan suhteellisen hinnan järjestyksessä merkitään
-     arvolla `discharge`, kunnes kumulatiivinen tehontarve ylittää kyseisen rivin
-     energiakynnyksen
-   * `run.txt` kirjoitetaan tästä taulusta lokiksi (`L`/`P`)
+   * varastoon jäävä teho: `P(T, Tmeno) - tehontarve`
+   * varaajan energiakynnys: `(55 - Tmeno) * 2 * 1.17`
+5. Ohjaussuunnitelma muodostetaan Erlangin `map`-taulukoksi, jossa avain on
+   vartin UTC-aika ja arvo on `discharge` (puuttuva avain = `normal`):
+   * päivän tehontarve lasketaan summana `(-0.2 * T + 6) * 0.25` kaikille
+     varttiriveille
+   * halvimmat vartit valitaan nousevan suhteellisen hinnan järjestyksessä
+     `normal`-tilaan, kunnes päivän tehontarve on katettu
+   * muut vartit merkitään arvolla `discharge`
+   * `run.txt` kirjoitetaan tästä taulusta lokiksi (`P`)
 
 `xml_parse` täyttää puuttuvat hintapositiot edellisellä hinnalla ennen
 `prices.txt`-kirjoitusta, kuten vanha `do_entso`-vaihe. `run.txt`-suunnittelu
 ei ole FMI:n tuntipäivityksen tai ENTSO:n 15 minuutin hakusilmukan osa, vaan se ajetaan
 kerran illassa klo 21:41 paikallista aikaa seuraavaa päivää varten vanhan
 crontab-esimerkin mukaisesti. Päiväkohtaisen datan polku on aina
-`/var/www/htdocs/jedi.ydns.eu/var`. `P55`/`COP55`-arvoja ei enää lueta
-`const`-hakemistosta, vaan niitä muutetaan päivittämällä `entso_tables`-moduulin
-vektorit.
+`/var/www/htdocs/jedi.ydns.eu/var`. `P`/`COP`-mallia päivitetään
+muokkaamalla `entso_tables`-moduulia.

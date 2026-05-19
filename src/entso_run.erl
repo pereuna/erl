@@ -13,13 +13,7 @@ plan_day(Day) ->
     PricesFile = filename:join(DayDir, "prices.txt"),
     TempsFile = filename:join(DayDir, "temps.txt"),
     RunLogFile = filename:join(DayDir, "run.txt"),
-    case build_plan_files(
-        PricesFile,
-        TempsFile,
-        RunLogFile,
-        entso_tables:p55(),
-        entso_tables:cop55()
-    ) of
+    case build_plan_files(PricesFile, TempsFile, RunLogFile) of
         {ok, Metadata, _Plan} -> {ok, Metadata};
         {error, Reason} -> {error, Reason}
     end.
@@ -30,84 +24,96 @@ action_for_time(TimeUtc) ->
     case build_plan_files(
         filename:join(DayDir, "prices.txt"),
         filename:join(DayDir, "temps.txt"),
-        filename:join(DayDir, "run.txt"),
-        entso_tables:p55(),
-        entso_tables:cop55()
+        filename:join(DayDir, "run.txt")
     ) of
         {ok, _Metadata, Plan} -> {ok, maps:get(TimeUtc, Plan, normal)};
         {error, Reason} -> {error, Reason}
     end.
 
-build_plan_files(PricesFile, TempsFile, RunLogFile, P55, COP55) ->
+build_plan_files(PricesFile, TempsFile, RunLogFile) ->
     try
         Prices = prices(PricesFile),
         Temps = temps(TempsFile),
-        Rows = rows(Temps, Prices, P55, COP55),
+        Rows = rows(Temps, Prices),
         Plan = control_plan(Rows),
         RunLog = run_log(Plan),
         ok = filelib:ensure_dir(RunLogFile),
         ok = file:write_file(RunLogFile, RunLog),
-        Metadata = #{run => RunLogFile, rows => length(Rows), actions => maps:size(Plan)},
+        DailyNeed = daily_heat_need(Rows),
+        NormalHours = required_normal_hours(Rows, DailyNeed),
+        Metadata = #{
+            run => RunLogFile,
+            rows => length(Rows),
+            actions => maps:size(Plan),
+            daily_heat_need_kwh => DailyNeed,
+            required_normal_hours => NormalHours
+        },
         {ok, Metadata, Plan}
     catch
         Class:Reason ->
             {error, {Class, Reason}}
     end.
 
-rows(Temps, Prices, P55, COP55) ->
-    [row(Time, Temp, price_at(Time, Prices), P55, COP55) || {Time, Temp} <- Temps].
+rows(Temps, Prices) ->
+    [row(Time, Temp, price_at(Time, Prices)) || {Time, Temp} <- Temps].
 
-row(Time, Temp, Price, P55, COP55) ->
-    P55Value = maps:get(Temp, P55),
-    COP55Value = maps:get(Temp, COP55),
-    Rhinta = ((Price + 63.3) * 1.24) / COP55Value,
+row(Time, Temp, Price) ->
+    SupplyTemp = entso_tables:target_supply_temp(Temp),
+    PValue = entso_tables:p(Temp, SupplyTemp),
+    COPValue = entso_tables:cop(Temp, SupplyTemp),
+    Rhinta = ((Price + 63.3) * 1.24) / COPValue,
     Ptarve = -0.2 * Temp + 6,
-    Pvarasto = P55Value - Ptarve,
-    Tdiff = 55 - (-0.0067 * Temp - 0.9 * Temp + 42.7),
+    Pvarasto = PValue - Ptarve,
+    Tdiff = 55 - SupplyTemp,
     Udiff = Tdiff * ?VVARAAJA * ?U,
     #{time => Time, temp => Temp, price => Price, rhinta => Rhinta,
-      ptarve => Ptarve, pvarasto => Pvarasto, udiff => Udiff}.
+      ptarve => Ptarve, pvarasto => Pvarasto, udiff => Udiff,
+      normal_energy => PValue * 0.25}.
 
 control_plan(Rows) ->
+    DailyNeed = daily_heat_need(Rows),
     Cheapest = lists:sort(fun cheaper_first/2, Rows),
-    Expensive = lists:sort(fun pricier_first/2, Rows),
-    Charge = selected_times(Cheapest, pvarasto),
-    Discharge = selected_times(Expensive, ptarve),
-    %% Jos sama vartti päätyy molempiin listoihin, lataus voittaa kuten vanhassa
-    %% shell-logiikassa, joka tarkisti L-merkinnän ennen P-merkintää.
-    maps:merge(
-        maps:from_list([{Time, discharge} || Time <- Discharge]),
-        maps:from_list([{Time, charge} || Time <- Charge])
-    ).
+    {NormalTimes, _Delivered} = select_normal_times(Cheapest, DailyNeed),
+    NormalSet = maps:from_list([{Time, true} || Time <- NormalTimes]),
+    DischargeTimes = [maps:get(time, Row) || Row <- Rows, not maps:is_key(maps:get(time, Row), NormalSet)],
+    maps:from_list([{Time, discharge} || Time <- DischargeTimes]).
 
 run_log(Plan) ->
     Lines = [io_lib:format("~s\t~s~n", [Time, action_label(Action)]) ||
         {Time, Action} <- lists:sort(maps:to_list(Plan))],
     unicode:characters_to_binary(Lines).
 
-action_label(charge) -> "L";
 action_label(discharge) -> "P".
 
 cheaper_first(A, B) ->
     sort_key(A) < sort_key(B).
 
-pricier_first(A, B) ->
-    sort_key(A) > sort_key(B).
-
 sort_key(Row) ->
     {maps:get(rhinta, Row), maps:get(time, Row)}.
 
-selected_times(Rows, SumKey) ->
-    selected_times(Rows, SumKey, 0.0, []).
+daily_heat_need(Rows) ->
+    lists:sum([maps:get(normal_energy, Row) || Row <- Rows]).
 
-selected_times([], _SumKey, _Acc, Out) ->
+required_normal_hours([], _DailyNeed) ->
+    0.0;
+required_normal_hours(Rows, DailyNeed) ->
+    AvgNormalPower = lists:sum([maps:get(pvarasto, Row) + maps:get(ptarve, Row) || Row <- Rows]) / length(Rows),
+    case AvgNormalPower =< 0.0 of
+        true -> 24.0;
+        false -> DailyNeed / AvgNormalPower
+    end.
+
+select_normal_times(Rows, Need) ->
+    select_normal_times(Rows, Need, 0.0, []).
+
+select_normal_times([], _Need, _Acc, Out) ->
     lists:reverse(Out);
-selected_times([Row | Rest], SumKey, Acc0, Out) ->
-    Acc = Acc0 + maps:get(SumKey, Row),
+select_normal_times([Row | Rest], Need, Acc0, Out) ->
+    Acc = Acc0 + maps:get(normal_energy, Row),
     Out1 = [maps:get(time, Row) | Out],
-    case Acc > maps:get(udiff, Row) of
+    case Acc >= Need of
         true -> lists:reverse(Out1);
-        false -> selected_times(Rest, SumKey, Acc, Out1)
+        false -> select_normal_times(Rest, Need, Acc, Out1)
     end.
 
 temps(File) ->
