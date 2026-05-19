@@ -73,7 +73,7 @@ row(Time, Temp, Price) ->
 control_plan(Rows) ->
     DailyNeed = daily_heat_need(Rows),
     Cheapest = lists:sort(fun cheaper_first/2, Rows),
-    {NormalTimes, _Delivered} = select_normal_times(Cheapest, DailyNeed),
+    NormalTimes = select_normal_times(Cheapest, DailyNeed),
     NormalSet = maps:from_list([{Time, true} || Time <- NormalTimes]),
     DischargeTimes = [maps:get(time, Row) || Row <- Rows, not maps:is_key(maps:get(time, Row), NormalSet)],
     maps:from_list([{Time, discharge} || Time <- DischargeTimes]).
