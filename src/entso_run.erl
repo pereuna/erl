@@ -92,15 +92,19 @@ sort_key(Row) ->
     {maps:get(rhinta, Row), maps:get(time, Row)}.
 
 daily_heat_need(Rows) ->
-    lists:sum([maps:get(normal_energy, Row) || Row <- Rows]).
+    lists:sum([quarter_heat_need(Row) || Row <- Rows]).
 
 required_normal_hours([], _DailyNeed) ->
     0.0;
 required_normal_hours(Rows, DailyNeed) ->
-    AvgNormalPower = lists:sum([maps:get(pvarasto, Row) + maps:get(ptarve, Row) || Row <- Rows]) / length(Rows),
-    case AvgNormalPower =< 0.0 of
-        true -> 24.0;
-        false -> DailyNeed / AvgNormalPower
+    AvgChargePower = lists:sum([max(maps:get(pvarasto, Row), 0.0) || Row <- Rows]) / length(Rows),
+    case DailyNeed =< 0.0 of
+        true -> 0.0;
+        false ->
+            case AvgChargePower =< 0.0 of
+                true -> 24.0;
+                false -> DailyNeed / AvgChargePower
+            end
     end.
 
 select_normal_times(Rows, Need) ->
@@ -109,12 +113,15 @@ select_normal_times(Rows, Need) ->
 select_normal_times([], _Need, _Acc, Out) ->
     lists:reverse(Out);
 select_normal_times([Row | Rest], Need, Acc0, Out) ->
-    Acc = Acc0 + maps:get(normal_energy, Row),
+    Acc = Acc0 + quarter_heat_need(Row),
     Out1 = [maps:get(time, Row) | Out],
     case Acc >= Need of
         true -> lists:reverse(Out1);
         false -> select_normal_times(Rest, Need, Acc, Out1)
     end.
+
+quarter_heat_need(Row) ->
+    max(maps:get(ptarve, Row), 0.0) * 0.25.
 
 temps(File) ->
     {ok, Bin} = file:read_file(File),
