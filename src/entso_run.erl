@@ -113,7 +113,7 @@ select_normal_times(Rows, Need) ->
 select_normal_times([], _Need, _Acc, Out) ->
     lists:reverse(Out);
 select_normal_times([Row | Rest], Need, Acc0, Out) ->
-    Acc = Acc0 + quarter_heat_need(Row),
+    Acc = Acc0 + quarter_charge_energy(Row),
     Out1 = [maps:get(time, Row) | Out],
     case Acc >= Need of
         true -> lists:reverse(Out1);
@@ -122,6 +122,9 @@ select_normal_times([Row | Rest], Need, Acc0, Out) ->
 
 quarter_heat_need(Row) ->
     max(maps:get(ptarve, Row), 0.0) * 0.25.
+
+quarter_charge_energy(Row) ->
+    max(maps:get(pvarasto, Row), 0.0) * 0.25.
 
 temps(File) ->
     {ok, Bin} = file:read_file(File),
