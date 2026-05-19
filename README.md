@@ -1,5 +1,11 @@
 # erl
 
+## v2 – ensimmäinen muutos
+
+Tähän versioon lisättiin ensimmäinen dokumentoitu muutos: README sisältää nyt
+oman v2-osion, johon voidaan jatkossa kirjata pienetkin julkaisuun liittyvät
+muutokset selkeästi aikajärjestyksessä.
+
 ## OTP release
 
 Projektissa on `rebar3`/`relx`-release nimellä `quarter`. Release käynnistää
