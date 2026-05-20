@@ -39,13 +39,19 @@ build_plan_files(PricesFile, TempsFile, RunLogFile) ->
         RunLog = run_log(Plan),
         ok = filelib:ensure_dir(RunLogFile),
         ok = file:write_file(RunLogFile, RunLog),
-        DailyNeed = daily_heat_need(Rows),
-        NormalHours = required_normal_hours(Rows, DailyNeed),
+        DailyHeatNeed = daily_heat_need(Rows),
+        DailyElectricNeed = daily_electric_need(Rows),
+        NormalHours = required_normal_hours(Rows, DailyHeatNeed),
+        DischargeQuarters = maps:size(Plan),
+        NormalQuarters = length(Rows) - DischargeQuarters,
         Metadata = #{
             run => RunLogFile,
             rows => length(Rows),
-            actions => maps:size(Plan),
-            daily_heat_need_kwh => DailyNeed,
+            actions => DischargeQuarters,
+            discharge_quarters => DischargeQuarters,
+            normal_quarters => NormalQuarters,
+            daily_heat_need_kwh => DailyHeatNeed,
+            daily_electric_need_kwh => DailyElectricNeed,
             required_normal_hours => NormalHours
         },
         {ok, Metadata, Plan}
@@ -67,6 +73,7 @@ row(Time, Temp, Price) ->
     Tdiff = 55 - SupplyTemp,
     Udiff = Tdiff * ?VVARAAJA * ?U,
     #{time => Time, temp => Temp, price => Price, rhinta => Rhinta,
+      cop => COPValue,
       ptarve => Ptarve, pvarasto => Pvarasto, udiff => Udiff,
       normal_energy => PValue * 0.25}.
 
@@ -93,6 +100,9 @@ sort_key(Row) ->
 
 daily_heat_need(Rows) ->
     lists:sum([quarter_heat_need(Row) || Row <- Rows]).
+
+daily_electric_need(Rows) ->
+    lists:sum([quarter_electric_need(Row) || Row <- Rows]).
 
 required_normal_hours([], _DailyNeed) ->
     0.0;
@@ -122,6 +132,14 @@ select_normal_times([Row | Rest], Need, Acc0, Out) ->
 
 quarter_heat_need(Row) ->
     max(maps:get(ptarve, Row), 0.0) * 0.25.
+
+quarter_electric_need(Row) ->
+    HeatNeed = max(maps:get(ptarve, Row), 0.0),
+    COPValue = maps:get(cop, Row),
+    case COPValue =< 0.0 of
+        true -> 0.0;
+        false -> (HeatNeed / COPValue) * 0.25
+    end.
 
 quarter_charge_energy(Row) ->
     max(maps:get(pvarasto, Row), 0.0) * 0.25.

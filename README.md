@@ -144,3 +144,13 @@ kerran illassa klo 21:41 paikallista aikaa seuraavaa päivää varten vanhan
 crontab-esimerkin mukaisesti. Päiväkohtaisen datan polku on aina
 `/var/www/htdocs/jedi.ydns.eu/var`. `P`/`COP`-mallia päivitetään
 muokkaamalla `entso_tables`-moduulia.
+
+`plan_day/1` palauttaa lisäksi metadatan, jossa:
+* `actions` ja `discharge_quarters` ovat sama asia (kuinka moni vartti on
+  `discharge`/`P`-tilassa).
+* `normal_quarters` kertoo normal-tilaan valittujen varttien määrän.
+* `daily_heat_need_kwh` on lämpöenergian tarve (kWh_th) mallin
+  `(-0.2 * T + 6)` perusteella.
+* `daily_electric_need_kwh` on arvioitu sähköenergiantarve (kWh_el), jossa
+  huomioidaan COP: varttitarve lasketaan kaavalla
+  `((-0.2 * T + 6) / COP(T, Tmeno)) * 0.25`.
