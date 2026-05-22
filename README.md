@@ -72,7 +72,7 @@ Erlangia käytetään tai node on muuten saavutettavissa.
 
 * Erillistä `scheduler`-prosessia ei ole: `quarter_worker`, `hourly_worker` ja
   `daily_run_worker` ovat itsenäisiä gen_servereitä, jotka ajastavat omat työnsä
-  yhteisillä `eutils`-viivelaskureilla.
+  omilla ajastimillaan.
 * `quarter_worker` on vartin välein ajettava koordinaattori. Se kutsuu ensin
   `trig`-moduulia GPIO-ohjausta varten ja sen jälkeen `entso_quarter`-moduulia
   ENTSO-E:n `entso.xml`/`prices.txt`-tarkistusta varten.
@@ -80,7 +80,8 @@ Erlangia käytetään tai node on muuten saavutettavissa.
   jo haettu ja kelvollinen, sitä käytetään; muuten se haetaan. Klo 15:00 jälkeen
   sama tarkistus tehdään myös seuraavalle päivälle.
 * `hourly_worker` hakee FMI:n uusimmat havainnot ja ennusteen kerran tunnissa
-  ilman erillistä cache/due-tarkistusta. Ennen FMI-hakua se lukee ENTSO-E:n
+  käynnistyshetkestä lasketulla jaksolla ilman erillistä cache/due-tarkistusta.
+  Ennen FMI-hakua se lukee ENTSO-E:n
   päivän aikavälin `quarter_worker`in ylläpitämästä tilasta eikä käynnistä omaa
   ENTSO-E-hakua.
 * `daily_run_worker` ajaa illan `run.txt`-suunnittelun klo 21:41 paikallista
