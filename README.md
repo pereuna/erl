@@ -1,10 +1,9 @@
 # erl
 
-## v2 – ensimmäinen muutos
-
-Tähän versioon lisättiin ensimmäinen dokumentoitu muutos: README sisältää nyt
-oman v2-osion, johon voidaan jatkossa kirjata pienetkin julkaisuun liittyvät
-muutokset selkeästi aikajärjestyksessä.
+This is a test project for Codex, Erlang, OpenBSD, and Raspberry Pi (RPi)
+environments. The program controls detached-house heating based on outdoor
+temperature and exchange electricity prices. The server is available at
+https://jedi.ydns.eu.
 
 ## OTP release
 
@@ -47,17 +46,6 @@ Taustakäynnistys release-skriptillä:
 _build/default/rel/quarter/bin/quarter start
 _build/default/rel/quarter/bin/quarter stop
 ```
-
-### Devuan -> OpenBSD/RPI4 huomio
-
-`rebar.config` käyttää asetusta `{include_erts, false}`, koska Devuan/Linuxissa
-rakennettu ERTS ei ole siirrettävissä OpenBSD/RPI4-koneelle. Tuotantokoneelle
-pitää asentaa Erlang/OTP erikseen, tai release pitää rakentaa suoraan
-OpenBSD/RPI4-koneella.
-
-Jos rakennat releasen suoraan samalla OpenBSD/RPI4-koneella, jolla se ajetaan,
-voit halutessasi vaihtaa `include_erts`-asetukseksi `true`, jolloin release
-pakkaa mukaan kyseisen koneen Erlang-runtimen.
 
 ### Asetukset
 
