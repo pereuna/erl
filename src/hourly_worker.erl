@@ -1,5 +1,5 @@
 %% hourly_worker.erl
-%% Hakee FMI-säätiedot kerran tunnissa aina uusimman ennusteen mukaan.
+%% Hakee FMI-säätiedot kerran tunnissa käynnistyshetkestä lasketulla jaksolla.
 -module(hourly_worker).
 -behaviour(gen_server).
 
@@ -76,4 +76,4 @@ fetch_fmi(Specs) ->
     fmi:fetch_days(Specs).
 
 schedule_hourly_work() ->
-    erlang:send_after(eutils:compute_delay_to_next_hour_ms(), self(), fire_hourly_work).
+    erlang:send_after(timer:hours(1), self(), fire_hourly_work).
