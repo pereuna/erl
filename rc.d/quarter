@@ -1,0 +1,26 @@
+#!/bin/ksh
+#
+# OpenBSD rc.d script for the Erlang/OTP quarter release.
+# Install as /etc/rc.d/quarter and enable with:
+#   rcctl enable quarter
+#   rcctl start quarter
+
+# The release is expected to be copied under /usr/local/quarter.
+daemon="/usr/local/quarter/bin/quarter"
+daemon_user="_quarter"
+
+. /etc/rc.d/rc.subr
+
+rc_check() {
+	${rcexec} "${daemon} ping" >/dev/null 2>&1
+}
+
+rc_start() {
+	${rcexec} "${daemon} start"
+}
+
+rc_stop() {
+	${rcexec} "${daemon} stop"
+}
+
+rc_cmd $1
