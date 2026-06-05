@@ -97,6 +97,63 @@ koska suunnitelma voidaan aina muodostaa uudestaan levyllä olevista sää- ja
 hintatiedoista. GPIO-ohjaus käyttää kiinteästi OpenBSD:n `gpioctl`-komentoa,
 `gpio0`-laitetta sekä pinnejä 26 ja 20.
 
+
+## OpenBSD/RPi4 daemonina
+
+OpenBSD:ssä oikea tapa käynnistää `quarter` bootissa on tehdä sille oma
+`rc.d`-skripti ja ohjata sitä `rcctl`-komennolla. Repo sisältää valmiin
+mallin tiedostossa `rc.d/quarter`. Skripti käynnistää ja pysäyttää palvelun
+`rebar3`/`relx`-releasen omalla `bin/quarter start|stop` -rajapinnalla ja
+odottaa, että Erlang VM:n `beam.smp`-prosessi oikeasti ilmestyy tai poistuu.
+Tarkistus tehdään prosessista eikä `bin/quarter ping` -komennolla, koska
+remote ping voi epäonnistua liian aikaisin, vaikka daemonisoitu VM olisi jo
+käynnistymässä.
+
+Yksi suositeltu asennustapa OpenBSD/RPi4-koneella:
+
+```sh
+# Luo ajokäyttäjä, jolla ei ole kirjautumiskuorta.
+doas groupadd _quarter
+doas useradd -g _quarter -s /sbin/nologin -d /var/empty -L daemon _quarter
+
+# Rakenna release OpenBSD-koneella tai kopioi OpenBSD:ssä rakennettu release.
+rebar3 as prod release
+
+# Asenna release vakaaseen polkuun.
+doas rm -rf /usr/local/quarter
+doas mkdir -p /usr/local/quarter
+(cd _build/prod/rel/quarter && doas pax -rw -pe . /usr/local/quarter)
+doas chown -R _quarter:_quarter /usr/local/quarter
+
+# Varmista, että ohjelman käyttämät data- ja lokihakemistot ovat olemassa
+# ja että _quarter saa kirjoittaa niihin.
+doas mkdir -p /var/www/htdocs/jedi.ydns.eu/var \
+             /var/www/htdocs/jedi.ydns.eu/volatile
+doas chown -R _quarter:_quarter /var/www/htdocs/jedi.ydns.eu/var \
+                                 /var/www/htdocs/jedi.ydns.eu/volatile
+
+# Asenna rc.d-skripti.
+doas install -o root -g wheel -m 555 rc.d/quarter /etc/rc.d/quarter
+
+# Testaa käsin ja ota boot-käynnistys käyttöön.
+doas rcctl start quarter
+doas rcctl check quarter
+doas rcctl enable quarter
+```
+
+Hyödylliset ylläpitokomennot:
+
+```sh
+doas rcctl stop quarter
+doas rcctl restart quarter
+doas tail -f /var/www/htdocs/jedi.ydns.eu/volatile/quarter.log
+```
+
+Ennen tuotantokäyttöä vaihda `config/vm.args`-tiedoston cookie tai pidä cookie
+konekohtaisessa, versionhallinnan ulkopuolisessa release-konfiguraatiossa.
+Jos node halutaan pitää vain paikallisena, nykyinen `-sname quarter` riittää;
+älä avaa Erlangin EPMD-/distributed Erlang -portteja ulkoverkkoon.
+
 ## ENTSO/FMI run.txt -suunnittelu
 
 Seuraava vaihe vanhan cron-ajon (`/rc/trilogy.rc`) korvaamisessa on mukana

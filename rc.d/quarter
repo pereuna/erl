@@ -1,0 +1,56 @@
+#!/bin/ksh
+#
+# OpenBSD rc.d script for the Erlang/OTP quarter release.
+# Install as /etc/rc.d/quarter and enable with:
+#   rcctl enable quarter
+#   rcctl start quarter
+
+# The release is expected to be copied under /usr/local/quarter.
+daemon="/usr/local/quarter/bin/quarter"
+daemon_user="_quarter"
+
+# Match the Erlang VM that the relx start script launches.  Do not use
+# "quarter ping" for rc_check: remote ping can fail before the hidden control
+# node is ready, even though the daemonized VM is already running.
+pexp="beam(\\.smp)? .* -sname quarter"
+
+. /etc/rc.d/rc.subr
+
+rc_check() {
+	pgrep -q -u "${daemon_user}" -f "${pexp}"
+}
+
+quarter_wait_for() {
+	want="$1"
+	i=0
+
+	while [ ${i} -lt 30 ]; do
+		case "${want}" in
+		start)
+			rc_check && return 0
+			;;
+		stop)
+			rc_check || return 0
+			;;
+		esac
+
+		sleep 1
+		i=$((i + 1))
+	done
+
+	return 1
+}
+
+rc_start() {
+	rc_check && return 0
+	${rcexec} "${daemon} start" || return 1
+	quarter_wait_for start
+}
+
+rc_stop() {
+	rc_check || return 0
+	${rcexec} "${daemon} stop" || return 1
+	quarter_wait_for stop
+}
+
+rc_cmd $1
