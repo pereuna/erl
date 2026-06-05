@@ -117,8 +117,9 @@ doas useradd -g _quarter -s /sbin/nologin -d /var/empty -L daemon _quarter
 rebar3 as prod release
 
 # Asenna release vakaaseen polkuun.
+doas rm -rf /usr/local/quarter
 doas mkdir -p /usr/local/quarter
-doas rsync -a --delete _build/prod/rel/quarter/ /usr/local/quarter/
+(cd _build/prod/rel/quarter && doas pax -rw -pe . /usr/local/quarter)
 doas chown -R _quarter:_quarter /usr/local/quarter
 
 # Varmista, että ohjelman käyttämät data- ja lokihakemistot ovat olemassa
