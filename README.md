@@ -102,9 +102,12 @@ hintatiedoista. GPIO-ohjaus käyttää kiinteästi OpenBSD:n `gpioctl`-komentoa,
 
 OpenBSD:ssä oikea tapa käynnistää `quarter` bootissa on tehdä sille oma
 `rc.d`-skripti ja ohjata sitä `rcctl`-komennolla. Repo sisältää valmiin
-mallin tiedostossa `rc.d/quarter`. Skripti käyttää `rebar3`/`relx`-releasen
-omaa `bin/quarter start|stop|ping` -rajapintaa, jolloin Erlang-release saa
-hoitaa VM:n taustakäynnistyksen ja alasajon.
+mallin tiedostossa `rc.d/quarter`. Skripti käynnistää ja pysäyttää palvelun
+`rebar3`/`relx`-releasen omalla `bin/quarter start|stop` -rajapinnalla ja
+odottaa, että Erlang VM:n `beam.smp`-prosessi oikeasti ilmestyy tai poistuu.
+Tarkistus tehdään prosessista eikä `bin/quarter ping` -komennolla, koska
+remote ping voi epäonnistua liian aikaisin, vaikka daemonisoitu VM olisi jo
+käynnistymässä.
 
 Yksi suositeltu asennustapa OpenBSD/RPi4-koneella:
 
