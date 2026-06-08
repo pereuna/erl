@@ -117,13 +117,10 @@ doas groupadd _quarter
 doas useradd -g _quarter -s /sbin/nologin -d /var/empty -L daemon _quarter
 
 # Rakenna release OpenBSD-koneella tai kopioi OpenBSD:ssä rakennettu release.
-rebar3 as prod release
+rebar3 release
 
-# Asenna release vakaaseen polkuun.
-doas rm -rf /usr/local/quarter
-doas mkdir -p /usr/local/quarter
-(cd _build/prod/rel/quarter && doas pax -rw -pe . /usr/local/quarter)
-doas chown -R _quarter:_quarter /usr/local/quarter
+# Asenna tai päivitä release vakaaseen polkuun.
+doas ./update-quarter-release.escript
 
 # Varmista, että ohjelman käyttämät data- ja lokihakemistot ovat olemassa
 # ja että _quarter saa kirjoittaa niihin.
