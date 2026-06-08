@@ -51,7 +51,21 @@ _build/default/rel/quarter/bin/quarter stop
 
 * `config/sys.config` määrittää Erlang loggerin kirjoittamaan yhteiseen lokiin
   `/var/www/htdocs/jedi.ydns.eu/volatile/quarter.log`.
+* `config/sys.config.src` antaa ENTSO-E:n API-avaimen ensisijaisesti
+  build-/käynnistysympäristön `ENTSOE_API_KEY`-muuttujasta. Jos muuttujaa ei
+  ole saatavilla daemonille, `kurl` lukee avaimen tiedostosta
+  `/etc/quarter/entsoe_api_key`.
 * `config/vm.args` määrittää paikallisen noden nimen ja kehityscookien.
+
+Tuotantokoneella helpoin tapa antaa ENTSO-E-avain ilman shell-ympäristöä on
+luoda salaisuustiedosto `/etc/quarter`-hakemistoon ja antaa se `_quarter`-käyttäjän
+luettavaksi:
+
+```sh
+doas mkdir -p /etc/quarter
+doas sh -c 'umask 077; printf %s "$ENTSOE_API_KEY" > /etc/quarter/entsoe_api_key'
+doas chown _quarter:_quarter /etc/quarter/entsoe_api_key
+```
 
 Vaihda `config/vm.args`-tiedoston cookie ennen tuotantokäyttöä, jos distributed
 Erlangia käytetään tai node on muuten saavutettavissa.

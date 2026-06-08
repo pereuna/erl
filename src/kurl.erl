@@ -8,18 +8,56 @@
 -define(HOST, "web-api.tp.entsoe.eu").
 -define(DOM, "10YFI-1--------U").
 -define(PX, "/var/www/htdocs/jedi.ydns.eu/var").
+-define(API_KEY_FILE, "/etc/quarter/entsoe_api_key").
 
 apikey() ->
-    case application:get_env(quarter, entsoe_api_key) of
-        {ok, ApiKey} when ApiKey =/= "" ->
-            {api_key, ApiKey};
-        _ ->
-            case os:getenv("ENTSOE_API_KEY") of
-                false -> error({missing_config, entsoe_api_key});
-                "" -> error({empty_env, "ENTSOE_API_KEY"});
-                ApiKey -> {api_key, ApiKey}
-            end
+    apikey([
+        application_env,
+        {env, "ENTSOE_API_KEY"},
+        {file, api_key_file()}
+    ]).
+
+apikey([]) ->
+    {error, {missing_config, entsoe_api_key}};
+apikey([Source | Rest]) ->
+    case api_key_from(Source) of
+        {ok, ApiKey} -> {ok, ApiKey};
+        skip -> apikey(Rest)
     end.
+
+api_key_from(application_env) ->
+    case application:get_env(quarter, entsoe_api_key) of
+        {ok, ApiKey} -> normalize_api_key(ApiKey);
+        undefined -> skip
+    end;
+api_key_from({env, Name}) ->
+    case os:getenv(Name) of
+        false -> skip;
+        ApiKey -> normalize_api_key(ApiKey)
+    end;
+api_key_from({file, Path}) ->
+    case file:read_file(Path) of
+        {ok, Body} -> normalize_api_key(Body);
+        {error, _} -> skip
+    end.
+
+api_key_file() ->
+    case application:get_env(quarter, entsoe_api_key_file) of
+        {ok, Path} -> Path;
+        undefined -> ?API_KEY_FILE
+    end.
+
+normalize_api_key(ApiKey0) when is_binary(ApiKey0) ->
+    normalize_api_key(unicode:characters_to_list(ApiKey0));
+normalize_api_key(ApiKey0) when is_list(ApiKey0) ->
+    ApiKey = string:trim(ApiKey0),
+    case ApiKey of
+        "" -> skip;
+        "${" ++ _ -> skip;
+        _ -> {ok, ApiKey}
+    end;
+normalize_api_key(_ApiKey) ->
+    skip.
 
 %% Fetch one UTC day into /var/www/.../var/YYYY/MM/DD/entso.xml.
 %% entso_st.txt and entso_end.txt are intentionally not written anymore;
@@ -41,7 +79,15 @@ fetch_day(Day) ->
     end.
 
 fetch_day(Day, Out, Tmp) ->
-    {api_key, Api} = apikey(),
+    case apikey() of
+        {ok, Api} ->
+            fetch_day_with_api_key(Day, Out, Tmp, Api);
+        {error, Reason} ->
+            logger:info("get_entso_xml: ERROR day=~s ~p", [Day, Reason]),
+            {error, Reason}
+    end.
+
+fetch_day_with_api_key(Day, Out, Tmp, Api) ->
     application:ensure_all_started(ssl),
     application:ensure_all_started(inets),
     Url = entsoe_url(Day, Api),

@@ -10,6 +10,7 @@
    ]}
  ]},
  {quarter, [
-   {entsoe_api_key, "${ENTSOE_API_KEY}"}
+   {entsoe_api_key, "${ENTSOE_API_KEY}"},
+   {entsoe_api_key_file, "/etc/quarter/entsoe_api_key"}
  ]}
 ].
