@@ -1,4 +1,4 @@
-#!/usr/bin/env escript
+#!/usr/bin/env escript28
 %% -*- erlang -*-
 %%! -noshell
 
