@@ -10,10 +10,15 @@
 -define(PX, "/var/www/htdocs/jedi.ydns.eu/var").
 
 apikey() ->
-    case os:getenv("ENTSOE_API_KEY") of
-        false -> error({missing_env, "ENTSOE_API_KEY"});
-        "" -> error({empty_env, "ENTSOE_API_KEY"});
-        ApiKey -> {api_key, ApiKey}
+    case application:get_env(quarter, entsoe_api_key) of
+        {ok, ApiKey} when ApiKey =/= "" ->
+            {api_key, ApiKey};
+        _ ->
+            case os:getenv("ENTSOE_API_KEY") of
+                false -> error({missing_config, entsoe_api_key});
+                "" -> error({empty_env, "ENTSOE_API_KEY"});
+                ApiKey -> {api_key, ApiKey}
+            end
     end.
 
 %% Fetch one UTC day into /var/www/.../var/YYYY/MM/DD/entso.xml.
