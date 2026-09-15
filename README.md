@@ -123,21 +123,23 @@ Varsinainen ohjaustaulu pidetään vain laskennan tuloksena muistissa, ja `run.t
 kirjoitetaan siitä lokiksi:
 
 1. `prices.txt` antaa varttihinnat ja `temps.txt` antaa vastaavat ulkolämpötilat.
-2. Menoveden pyynti lasketaan `entso_tables:target_supply_temp/1`-funktion
-   lineaarisella säätökäyrällä: ulkolämpötilalla 22 °C pyynti on 22 °C ja
-   ulkolämpötilalla -15 °C pyynti on 55 °C. Taulukkolaskentaa varten tulos
-   rajataan välille 25..60 °C.
+2. Menoveden pyynti lasketaan vanhan `/rc/trilogy`-ohjauksen talokohtaisella
+   säätökäyrällä `-0.0067*T - 0.9*T + 42.7`. Taulukkolaskentaa varten
+   tulos rajataan välille 25..60 °C.
 3. `P` ja `COP` lasketaan menoveden ja ulkolämpötilan funktiona moduulissa
-   `entso_tables` (55 °C taulukoista johdettu yleistys).
+   `entso_tables`. Taulukon mittapisteet ovat Mitsubishi
+   PUHZ-SHW112V/YHA(-BS) -lämpöpumpun valmistajataulukosta; valmistajan
+   tyhjät reunapisteet on täytetty vanhoista `/www/const/P.txt`- ja
+   `/www/const/cop.txt`-taulukoista.
 4. Jokaiselle vartille lasketaan:
    * suhteellinen hinta: `((hinta + 63.3) * 1.24) / COP(T, Tmeno)`
-   * tilalämmityksen tehontarve: `max((8 / 43) * (17 - T), 0)`
+   * tilalämmityksen tehontarve: `max(-0.2*T + 6, 0)`
    * varastoon jäävä teho: `P(T, Tmeno) - tehontarve`
    * varaajan energiakynnys: `(55 - Tmeno) * 2 * 1.17`
 5. Ohjaussuunnitelma muodostetaan Erlangin `map`-taulukoksi, jossa avain on
    vartin UTC-aika ja arvo on `discharge` (puuttuva avain = `normal`):
    * päivän tehontarve lasketaan summana
-     `max((8 / 43) * (17 - T), 0) * 0.25` kaikille
+     `max(-0.2*T + 6, 0) * 0.25` kaikille
      varttiriveille
    * halvimmat vartit valitaan nousevan suhteellisen hinnan järjestyksessä
      `normal`-tilaan, kunnes päivän tehontarve on katettu
@@ -156,20 +158,14 @@ muokkaamalla `entso_tables`-moduulia.
 * `actions` ja `discharge_quarters` ovat sama asia (kuinka moni vartti on
   `discharge`/`P`-tilassa).
 * `normal_quarters` kertoo normal-tilaan valittujen varttien määrän.
-* `daily_heat_need_kwh` on lämpöenergian tarve (kWh_th) mallin
-  `max((8 / 43) * (17 - T), 0)` perusteella.
+* `daily_heat_need_kwh` on lämpöenergian tarve (kWh_th) talokohtaisen mallin
+  `max(-0.2*T + 6, 0)` perusteella.
 * `daily_electric_need_kwh` on arvioitu sähköenergiantarve (kWh_el), jossa
   huomioidaan COP: varttitarve lasketaan kaavalla
   `(tilalämmityksen tehontarve / COP(T, Tmeno)) * 0.25`.
 
-Tehontarvemalli on mitoitettu Porissa sijaitsevalle tavalliselle 160 m²:n
-omakotitalolle. Mitoitustehona käytetään 50 W/m² eli yhteensä 8 kW, kun
-ulkolämpötila on -26 °C. Lämmityksen tasapainolämpötila on 17 °C; tätä
-lämpimämmällä säällä tilalämmityksen tarve on mallissa nolla. Näistä arvoista
-saadaan lämpöhäviökertoimeksi `8 kW / 43 K` eli noin 0,186 kW/K.
-
-Kysymyksen lämpötilasarjan keskilämpötila on noin 14,33 °C. Uusi malli antaa
-sille noin 0,50 kW:n keskitehon ja 11,91 kWh:n tilalämmitysenergian
-vuorokaudessa aiemman 75,2 kWh:n sijaan. Käyttöveden lämmitystä ei sisällytetä
-lukuun. 50 W/m² on suunnitteluoletus: mallin mitoitusteho kannattaa myöhemmin
-korvata talon pakkaspäivinä mitatusta energiankulutuksesta johdetulla arvolla.
+Tehontarvemalli palautettiin talossa aiemmin toimineeseen kaavaan. Elokuussa
+2026 käyttöön otettu yleinen 160 m²:n talomalli antoi 14,33 °C:n
+keskilämpötilalla vain 11,91 kWh:n vuorokausitarpeen, kun talokohtainen kaava
+antaa 75,2 kWh. Syyskuun tuotantolokissa tämä jätti pumpun normal-tilaan vain
+0,5--2,5 tunniksi vuorokaudessa ja talo alkoi viiletä.

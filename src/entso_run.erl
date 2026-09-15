@@ -8,14 +8,6 @@
 -define(VVARAAJA, 2.0).
 -define(U, 1.17).
 
-%% Pori belongs to Finland's design-weather zone I (-26 C).  A design load of
-%% 50 W/m2 is a reasonable planning default for an ordinary detached house;
-%% the 17 C balance temperature accounts for internal and solar heat gains.
--define(HOUSE_AREA_M2, 160.0).
--define(DESIGN_HEAT_LOAD_W_M2, 50.0).
--define(DESIGN_OUTDOOR_TEMP_C, -26.0).
--define(HEATING_BALANCE_TEMP_C, 17.0).
-
 plan_day(Day) ->
     DayDir = day_dir(Day),
     PricesFile = filename:join(DayDir, "prices.txt"),
@@ -86,11 +78,10 @@ row(Time, Temp, Price) ->
       normal_energy => PValue * 0.25}.
 
 space_heat_demand_kw(OutdoorTemp) ->
-    DesignLoadKw = ?HOUSE_AREA_M2 * ?DESIGN_HEAT_LOAD_W_M2 / 1000.0,
-    DesignTemperatureDifference =
-        ?HEATING_BALANCE_TEMP_C - ?DESIGN_OUTDOOR_TEMP_C,
-    HeatLossKwPerK = DesignLoadKw / DesignTemperatureDifference,
-    max(HeatLossKwPerK * (?HEATING_BALANCE_TEMP_C - OutdoorTemp), 0.0).
+    %% Talokohtainen kaava vanhasta /rc/trilogy-ohjauksesta. Elokuussa 2026
+    %% käyttöön otettu yleinen 160 m2:n mitoitusmalli aliarvioi tämän talon
+    %% syyskuisen lämmöntarpeen ja jätti lämpöpumpun käymään vain 0,5--2,5 h/vrk.
+    max(-0.2 * OutdoorTemp + 6.0, 0.0).
 
 control_plan(Rows) ->
     DailyNeed = daily_heat_need(Rows),
